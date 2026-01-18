@@ -28,7 +28,10 @@ const translations = {
                 items_count: "Items in Fridge",
                 expiring_soon: "Expiring Soon",
                 saved_money: "Monthly Savings",
-                waste_prevented: "Waste Prevented"
+                waste_prevented: "Waste Prevented",
+                weekly: "Weekly",
+                monthly: "Monthly",
+                all_time: "All Time"
             },
             activity: "Recent Activity"
         },
@@ -94,7 +97,10 @@ const translations = {
                 items_count: "冰箱食物",
                 expiring_soon: "即将过期",
                 saved_money: "本月节省",
-                waste_prevented: "减少浪费"
+                waste_prevented: "减少浪费",
+                weekly: "本周",
+                monthly: "本月",
+                all_time: "总计"
             },
             activity: "最近动态"
         },
@@ -160,7 +166,10 @@ const translations = {
                 items_count: "냉장고 품목",
                 expiring_soon: "유통기한 임박",
                 saved_money: "이번 달 절약",
-                waste_prevented: "방지된 낭비"
+                waste_prevented: "방지된 낭비",
+                weekly: "이번 주",
+                monthly: "이번 달",
+                all_time: "전체"
             },
             activity: "최근 활동"
         },
@@ -226,7 +235,10 @@ const translations = {
                 items_count: "Artikel im Kühlschrank",
                 expiring_soon: "Bald ablaufend",
                 saved_money: "Monatl. Ersparnis",
-                waste_prevented: "Abfall vermieden"
+                waste_prevented: "Abfall vermieden",
+                weekly: "Wöchentlich",
+                monthly: "Monatlich",
+                all_time: "Gesamt"
             },
             activity: "Letzte Aktivitäten"
         },

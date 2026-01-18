@@ -233,14 +233,26 @@ export default function App() {
             const d = new Date(); d.setDate(now.getDate() - 30);
             return wastedDate >= d;
         }
-        if (statsFilter === 'year') {
-            const d = new Date(); d.setDate(now.getDate() - 365);
-            return wastedDate >= d;
+        return true;
+    });
+
+    const filteredConsumed = consumedHistory.filter(item => {
+        if (statsFilter === 'all') return true;
+        const consumedDate = new Date(item.consumed_at);
+        const now = new Date();
+        if (statsFilter === 'week') {
+            const d = new Date(); d.setDate(now.getDate() - 7);
+            return consumedDate >= d;
+        }
+        if (statsFilter === 'month') {
+            const d = new Date(); d.setDate(now.getDate() - 30);
+            return consumedDate >= d;
         }
         return true;
     });
 
     const filteredTotalWasted = filteredWaste.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
+    const filteredTotalSavings = filteredConsumed.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -610,6 +622,7 @@ export default function App() {
             console.error('Error updating item:', error);
             alert('Failed to update item');
         } else {
+            await logActivity('UPDATE', updates.name || id, 'Updated item details');
             refreshData(currentFridgeId);
         }
     };
@@ -624,6 +637,7 @@ export default function App() {
             console.error('Error updating waste log:', error);
             alert('Failed to update log');
         } else {
+            await logActivity('UPDATE_HISTORY', updates.name || id, 'Updated waste log');
             refreshData(currentFridgeId);
         }
     };
@@ -637,6 +651,7 @@ export default function App() {
             console.error('Error updating consumed log:', error);
             alert('Failed to update log');
         } else {
+            await logActivity('UPDATE_HISTORY', updates.name || id, 'Updated consumption log');
             refreshData(currentFridgeId);
         }
     };
@@ -652,6 +667,7 @@ export default function App() {
             console.error('Error deleting log:', error);
             alert('Failed to delete log');
         } else {
+            await logActivity('DELETE_HISTORY', type, `Deleted ${type} log entry`);
             refreshData(currentFridgeId);
         }
     };
@@ -1052,10 +1068,20 @@ export default function App() {
     const getHistoryItems = () => {
         let items = [];
         if (historyFilter === 'all' || historyFilter === 'waste') {
-            items = [...items, ...wasteHistory.map(i => ({ ...i, type: 'waste', date: i.wasted_at || i.wastedAt }))];
+            items = [...items, ...wasteHistory.map(i => ({
+                ...i,
+                type: 'waste',
+                date: i.wasted_at || i.wastedAt,
+                uniqueId: `waste-${i.id}`
+            }))];
         }
         if (historyFilter === 'all' || historyFilter === 'consumed') {
-            items = [...items, ...consumedHistory.map(i => ({ ...i, type: 'consumed', date: i.consumed_at }))];
+            items = [...items, ...consumedHistory.map(i => ({
+                ...i,
+                type: 'consumed',
+                date: i.consumed_at,
+                uniqueId: `consumed-${i.id}`
+            }))];
         }
 
         // Filter by search
@@ -1068,7 +1094,19 @@ export default function App() {
     };
 
     const historyItems = getHistoryItems();
-    const historyGroups = groupItemsByDate(historyItems, 'date');
+
+    // Specific grouping for History that groups by actual calendar dates
+    const groupHistoryByDate = (items) => {
+        const groups = {};
+        items.forEach(item => {
+            const date = new Date(item.date).toLocaleDateString();
+            if (!groups[date]) groups[date] = [];
+            groups[date].push(item);
+        });
+        return groups;
+    };
+
+    const historyGroups = groupHistoryByDate(historyItems);
 
 
 
@@ -1330,6 +1368,26 @@ export default function App() {
                                 </div>
                             </div>
 
+                            {/* Stats Filter Toggle */}
+                            <div className="flex bg-white/50 backdrop-blur p-1 rounded-2xl border border-slate-200 self-start">
+                                {[
+                                    { id: 'week', label: t('home.stats.weekly') },
+                                    { id: 'month', label: t('home.stats.monthly') },
+                                    { id: 'all', label: t('home.stats.all_time') }
+                                ].map(filter => (
+                                    <button
+                                        key={filter.id}
+                                        onClick={() => setStatsFilter(filter.id)}
+                                        className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${statsFilter === filter.id
+                                            ? 'bg-slate-900 text-white shadow-lg shadow-slate-200'
+                                            : 'text-slate-400 hover:text-slate-600'
+                                            }`}
+                                    >
+                                        {filter.label}
+                                    </button>
+                                ))}
+                            </div>
+
                             {/* Bento Box Grid */}
                             <div className="flex flex-col gap-4">
                                 {/* Top: Total Value (Full Width) */}
@@ -1347,27 +1405,24 @@ export default function App() {
                                 {/* Middle: Split Grid */}
                                 <div className="grid grid-cols-2 gap-4">
                                     {/* Wasted */}
-                                    <div className="p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex flex-col justify-between h-32">
+                                    <div className="p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex flex-col justify-between h-auto min-h-[128px]">
                                         <div className="w-10 h-10 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-2">
                                             <Trash2 size={20} />
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-black uppercase text-slate-400">{t('home.stats.waste_prevented')}</p>
-                                            <p className="text-2xl font-black text-slate-800">${totalWasted.toFixed(2)}</p>
+                                            <p className="text-2xl font-black text-slate-800">${filteredTotalWasted.toFixed(2)}</p>
                                         </div>
                                     </div>
 
-                                    {/* Expiring */}
-                                    <div className="p-5 bg-amber-50 border border-amber-100 rounded-[2rem] flex flex-col justify-between h-32">
-                                        <div className="w-10 h-10 bg-white text-amber-500 rounded-full flex items-center justify-center mb-2 shadow-sm">
-                                            <Clock size={20} />
+                                    {/* Savings/Consumed */}
+                                    <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-[2rem] flex flex-col justify-between h-auto min-h-[128px]">
+                                        <div className="w-10 h-10 bg-white text-emerald-500 rounded-full flex items-center justify-center mb-2 shadow-sm">
+                                            <CheckCircle2 size={20} />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-black uppercase text-amber-500">{t('home.stats.expiring_soon')}</p>
-                                            <p className="text-2xl font-black text-amber-700">{items.filter(i => {
-                                                const days = Math.ceil((new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24));
-                                                return days <= 3 && days >= 0;
-                                            }).length} <span className="text-xs font-bold opacity-60">{t('common.items')}</span></p>
+                                            <p className="text-[10px] font-black uppercase text-emerald-500">{t('home.stats.saved_money')}</p>
+                                            <p className="text-2xl font-black text-emerald-700">${filteredTotalSavings.toFixed(2)}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1873,7 +1928,7 @@ export default function App() {
                                     </h3>
                                     <div className="space-y-2">
                                         {items.map(item => (
-                                            <div key={item.id} className={`bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between group ${item.type === 'waste' ? 'border-l-4 border-l-red-400' : 'border-l-4 border-l-emerald-400'}`}>
+                                            <div key={item.uniqueId} className={`bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between group ${item.type === 'waste' ? 'border-l-4 border-l-red-400' : 'border-l-4 border-l-emerald-400'}`}>
                                                 <div className="flex items-center gap-3">
                                                     <span className="text-2xl">{CATEGORIES[item.category]?.icon || '📦'}</span>
                                                     <div>
@@ -1887,15 +1942,15 @@ export default function App() {
                                                 </div>
                                                 <div className="relative">
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.id ? null : item.id); }}
+                                                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.uniqueId ? null : item.uniqueId); }}
                                                         className="p-2 text-slate-300 hover:text-slate-600 rounded-lg"
                                                     >
                                                         <MoreVertical size={16} />
                                                     </button>
-                                                    {openMenuId === item.id && (
+                                                    {openMenuId === item.uniqueId && (
                                                         <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-20 min-w-[140px] flex flex-col gap-1 animate-in fade-in zoom-in-95 origin-top-right">
                                                             <button
-                                                                onClick={() => { setEditingItem(item); setEditType(item.type === 'waste' ? 'waste' : 'consumed'); setOpenMenuId(null); }}
+                                                                onClick={() => { setEditingItem(item); setEditType(item.type); setOpenMenuId(null); }}
                                                                 className="flex items-center gap-2 p-3 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-600"
                                                             >
                                                                 <Pencil size={14} /> {t('common.edit')}
@@ -1908,7 +1963,7 @@ export default function App() {
                                                             </button>
                                                         </div>
                                                     )}
-                                                    {openMenuId === item.id && (
+                                                    {openMenuId === item.uniqueId && (
                                                         <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
                                                     )}
                                                 </div>
