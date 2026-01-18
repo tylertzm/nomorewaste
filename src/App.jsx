@@ -130,6 +130,7 @@ export default function App() {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterCategory, setFilterCategory] = useState('All');
     const [sortBy, setSortBy] = useState('expiry'); // expiry, created_at, price, name
+    const [sortDirection, setSortDirection] = useState('desc');
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1119,14 +1120,17 @@ export default function App() {
             .sort((a, b) => {
                 const parsePrice = (p) => {
                     if (typeof p === 'number') return p;
-                    return parseFloat(String(p || '0').replace(/[^0-9.]/g, '')) || 0;
+                    const cleaned = String(p || '0').replace(/[^0-9.]/g, '');
+                    return parseFloat(cleaned) || 0;
                 };
 
-                if (sortBy === 'expiry') return new Date(a.expiry || '9999-12-31') - new Date(b.expiry || '9999-12-31');
-                if (sortBy === 'created_at') return new Date(b[dateKey] || b.created_at) - new Date(a[dateKey] || a.created_at);
-                if (sortBy === 'price') return parsePrice(b.price) - parsePrice(a.price);
-                if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
-                return 0;
+                let comparison = 0;
+                if (sortBy === 'expiry') comparison = new Date(a.expiry || '9999-12-31') - new Date(b.expiry || '9999-12-31');
+                else if (sortBy === 'created_at') comparison = new Date(a[dateKey] || a.created_at) - new Date(b[dateKey] || b.created_at);
+                else if (sortBy === 'price') comparison = parsePrice(a.price) - parsePrice(b.price);
+                else if (sortBy === 'name') comparison = (a.name || '').localeCompare(b.name || '');
+
+                return sortDirection === 'asc' ? comparison : -comparison;
             });
     };
 
@@ -1367,18 +1371,26 @@ export default function App() {
                                     </button>
 
                                     {activeTab === 'fridge' && (
-                                        <div className="relative">
-                                            <select
-                                                value={sortBy}
-                                                onChange={(e) => setSortBy(e.target.value)}
-                                                className="appearance-none pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                        <div className="flex gap-2">
+                                            <div className="relative">
+                                                <select
+                                                    value={sortBy}
+                                                    onChange={(e) => setSortBy(e.target.value)}
+                                                    className="appearance-none pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                                >
+                                                    <option value="expiry">Expiry</option>
+                                                    <option value="created_at">Added</option>
+                                                    <option value="price">Price</option>
+                                                    <option value="name">Name</option>
+                                                </select>
+                                                <Filter className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={12} />
+                                            </div>
+                                            <button
+                                                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                                                className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-500 hover:text-emerald-500 hover:border-emerald-200 transition-all font-black text-xs"
                                             >
-                                                <option value="expiry">Expiry Date</option>
-                                                <option value="created_at">Date Added</option>
-                                                <option value="price">Price</option>
-                                                <option value="name">Name</option>
-                                            </select>
-                                            <ArrowUpDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                                                {sortDirection === 'asc' ? 'ASC' : 'DSC'}
+                                            </button>
                                         </div>
                                     )}
                                 </div>
