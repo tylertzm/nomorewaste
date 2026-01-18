@@ -1559,7 +1559,7 @@ export default function App() {
                                 </div>
 
                                 {/* Middle: Split Grid */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {/* Waste Prevented (Consumed) */}
                                     <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-[2rem] flex flex-col justify-between h-auto min-h-[140px] hover-lift transition-all">
                                         <div className="w-10 h-10 bg-white text-emerald-500 rounded-full flex items-center justify-center mb-2 shadow-sm">
@@ -2185,9 +2185,9 @@ export default function App() {
                 {/* Modal */}
                 {
                     isModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6">
-                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-                            <div className="relative bg-white w-full max-w-md rounded-[2.5rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10 duration-300 max-h-[90vh] overflow-y-auto">
+                        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 transition-all duration-300">
+                            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setIsModalOpen(false)} />
+                            <div className="relative bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 sm:p-8 shadow-2xl animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-10 duration-500 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
 
                                 {/* Modal Header */}
                                 <div className="flex justify-between items-center mb-8">
@@ -2255,7 +2255,7 @@ export default function App() {
                                                             <X size={16} />
                                                         </button>
                                                     </div>
-                                                    <div className="grid grid-cols-3 gap-3">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                         <div>
                                                             <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Price ($)</label>
                                                             <input type="number" value={item.price} onChange={(e) => updateDraft(item.id, 'price', parseFloat(e.target.value))}
@@ -2300,8 +2300,9 @@ export default function App() {
                     )
                 }
                 {isManualAddOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-                        <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95">
+                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+                        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsManualAddOpen(false)} />
+                        <div className="relative bg-white w-full max-w-sm rounded-t-[2.5rem] sm:rounded-[2rem] p-6 sm:p-8 shadow-2xl animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-300">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-lg font-black text-slate-800 flex items-center gap-2 uppercase">
                                     <Plus className="text-emerald-500" /> Add to {manualAddType}
@@ -2338,7 +2339,7 @@ export default function App() {
                                 {manualAddType === 'fridge' && (
                                     <div>
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Expiry Date</label>
-                                        <input name="expiry" type="date" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" />
+                                        <input name="expiry" type="date" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none text-base" />
                                     </div>
                                 )}
 
@@ -2353,9 +2354,9 @@ export default function App() {
                 {/* Partial Waste Modal */}
                 {
                     wastingItem && (
-                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+                        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-6">
                             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setWastingItem(null)} />
-                            <div className="relative bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                            <div className="relative bg-white w-full max-w-sm rounded-t-[2.5rem] sm:rounded-[2rem] p-6 sm:p-8 shadow-2xl animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-300">
                                 <div className="text-center mb-6">
                                     <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
                                         {wastingItem.emoji || '🗑️'}
@@ -2402,9 +2403,9 @@ export default function App() {
                 {/* Edit Modal */}
                 {
                     editingItem && (
-                        <div className="fixed inset-0 z-[70] flex items-center justify-center p-6">
+                        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-6">
                             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setEditingItem(null)} />
-                            <div className="relative bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                            <div className="relative bg-white w-full max-w-sm rounded-t-[2.5rem] sm:rounded-[2rem] p-6 sm:p-8 shadow-2xl animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-300">
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
                                         <Pencil size={20} className="text-emerald-500" /> EDIT DETAILS
