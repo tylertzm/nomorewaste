@@ -457,32 +457,50 @@ export default function App() {
 
             await refreshData(fridgeIdLocal);
 
-            // Real-time Subscription
-            const channel = supabase
-                .channel('fridge_updates')
+            // Real-time Subscription - Items
+            const itemsChannel = supabase
+                .channel('items_realtime')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter: `fridge_id=eq.${fridgeIdLocal}` }, (payload) => {
                     if (payload.eventType === 'INSERT') setItems(prev => [payload.new, ...prev]);
                     if (payload.eventType === 'DELETE') setItems(prev => prev.filter(i => i.id !== payload.old.id));
                     if (payload.eventType === 'UPDATE') setItems(prev => prev.map(i => i.id === payload.new.id ? payload.new : i));
                 })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'waste_logs', filter: `fridge_id=eq.${fridgeIdLocal}` }, (payload) => {
-                    if (payload.eventType === 'INSERT') setWasteHistory(prev => [payload.new, ...prev]);
-                })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'consumed_logs', filter: `fridge_id=eq.${fridgeIdLocal}` }, (payload) => {
-                    if (payload.eventType === 'INSERT') setConsumedHistory(prev => [payload.new, ...prev]);
-                })
-                .on(
-                    'postgres_changes',
-                    { event: 'INSERT', schema: 'public', table: 'activity_logs', filter: `fridge_id=eq.${fridgeIdLocal}` },
-                    (payload) => {
-                        setActivityLogs(prev => [payload.new, ...prev]);
-                        // Simple Toast
-                        // alert(`New Activity: ${payload.new.action_type} - ${payload.new.item_name}`);
-                    }
-                )
                 .subscribe();
 
-            return () => supabase.removeChannel(channel);
+            // Real-time Subscription - Waste Logs
+            const wasteChannel = supabase
+                .channel('waste_realtime')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'waste_logs', filter: `fridge_id=eq.${fridgeIdLocal}` }, (payload) => {
+                    if (payload.eventType === 'INSERT') setWasteHistory(prev => [payload.new, ...prev]);
+                    if (payload.eventType === 'DELETE') setWasteHistory(prev => prev.filter(i => i.id !== payload.old.id));
+                    if (payload.eventType === 'UPDATE') setWasteHistory(prev => prev.map(i => i.id === payload.new.id ? payload.new : i));
+                })
+                .subscribe();
+
+            // Real-time Subscription - Consumed Logs
+            const consumedChannel = supabase
+                .channel('consumed_realtime')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'consumed_logs', filter: `fridge_id=eq.${fridgeIdLocal}` }, (payload) => {
+                    if (payload.eventType === 'INSERT') setConsumedHistory(prev => [payload.new, ...prev]);
+                    if (payload.eventType === 'DELETE') setConsumedHistory(prev => prev.filter(i => i.id !== payload.old.id));
+                    if (payload.eventType === 'UPDATE') setConsumedHistory(prev => prev.map(i => i.id === payload.new.id ? payload.new : i));
+                })
+                .subscribe();
+
+            // Real-time Subscription - Activity
+            const activityChannel = supabase
+                .channel('activity_realtime')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_logs', filter: `fridge_id=eq.${fridgeIdLocal}` }, (payload) => {
+                    setActivityLogs(prev => [payload.new, ...prev]);
+                })
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(itemsChannel);
+                supabase.removeChannel(wasteChannel);
+                supabase.removeChannel(consumedChannel);
+                supabase.removeChannel(activityChannel);
+            };
         };
 
         fetchData();
@@ -665,28 +683,33 @@ export default function App() {
         const table = type === 'waste' ? 'waste_logs' : 'consumed_logs';
         console.log(`Deleting ${type} with ID ${id} from ${table}`);
 
-        const { error } = await supabase
+        const { data: deletedData, error } = await supabase
             .from(table)
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .select();
 
         if (error) {
             console.error('Error deleting log:', error);
             alert(`Failed to delete log: ${error.message}`);
+        } else if (!deletedData || deletedData.length === 0) {
+            console.warn('Delete statement executed but 0 rows were affected. Check RLS policies.');
+            alert('Could not delete the item. You might not have permission, or it was already deleted.');
         } else {
-            console.log('Delete successful');
+            console.log(`Delete successful. Rows affected: ${deletedData.length}`);
+
+            // Proactive state removal to ensure the UI updates even if refreshData is slow
+            if (type === 'waste') {
+                setWasteHistory(prev => prev.filter(i => i.id !== id));
+            } else if (type === 'consumed') {
+                setConsumedHistory(prev => prev.filter(i => i.id !== id));
+            }
+
             await logActivity('DELETE_HISTORY', type, `Deleted ${type} log entry`);
 
-            // Explicitly use the current fridge ID to avoid any state delay issues
             if (currentFridgeId) {
+                console.log(`Refreshing data for fridge: ${currentFridgeId}`);
                 await refreshData(currentFridgeId);
-            } else {
-                // Secondary fallback: Fetch fridge ID again if needed
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    const { data: fu } = await supabase.from('fridge_users').select('fridge_id').eq('user_id', user.id).single();
-                    if (fu) refreshData(fu.fridge_id);
-                }
             }
         }
     };
