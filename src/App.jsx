@@ -1109,6 +1109,25 @@ export default function App() {
     const totalWasted = wasteHistory.reduce((acc, curr) => acc + ((curr.price || 0) * (curr.quantity || 1)), 0);
     const isNative = Capacitor.isNativePlatform();
 
+    const parsePrice = (val) => {
+        if (typeof val === 'number') return val;
+        let s = String(val || '0');
+        // Treat both , and . as decimal separators. 
+        // We replace commas with dots, and if there are multiple dots (like 1.234.56), 
+        // we keep only the last one for parsing to be as robust as possible.
+        s = s.replace(/,/g, '.');
+        const parts = s.split('.');
+        if (parts.length > 2) {
+            // Reconstruct: join all but last with empty, then add last part
+            const last = parts.pop();
+            s = parts.join('') + '.' + last;
+        } else {
+            s = parts.join('.');
+        }
+        const p = parseFloat(s.replace(/[^0-9.]/g, ''));
+        return isNaN(p) ? 0 : p;
+    };
+
     // Filter & Sort Logic Helpers
     const getFilteredList = (list, dateKey) => {
         return list
@@ -1118,17 +1137,11 @@ export default function App() {
                 return matchesSearch && matchesCategory;
             })
             .sort((a, b) => {
-                const parsePrice = (p) => {
-                    if (typeof p === 'number') return p;
-                    const cleaned = String(p || '0').replace(/[^0-9.]/g, '');
-                    return parseFloat(cleaned) || 0;
-                };
-
                 let comparison = 0;
-                if (sortBy === 'expiry') comparison = new Date(a.expiry || '9999-12-31') - new Date(b.expiry || '9999-12-31');
-                else if (sortBy === 'created_at') comparison = new Date(a[dateKey] || a.created_at) - new Date(b[dateKey] || b.created_at);
-                else if (sortBy === 'price') comparison = parsePrice(a.price) - parsePrice(b.price);
+                if (sortBy === 'price') comparison = parsePrice(a.price) - parsePrice(b.price);
+                else if (sortBy === 'expiry') comparison = new Date(a.expiry || '9999-12-31') - new Date(b.expiry || '9999-12-31');
                 else if (sortBy === 'name') comparison = (a.name || '').localeCompare(b.name || '');
+                else comparison = new Date(a[dateKey] || a.created_at || 0) - new Date(b[dateKey] || b.created_at || 0);
 
                 return sortDirection === 'asc' ? comparison : -comparison;
             });
@@ -1174,9 +1187,10 @@ export default function App() {
         const groups = {};
         items.forEach(item => {
             const d = new Date(item.date);
-            const dateStr = isNaN(d) ? 'Unknown Date' : d.toLocaleDateString();
-            if (!groups[dateStr]) groups[dateStr] = [];
-            groups[dateStr].push(item);
+            // Use ISO date (YYYY-MM-DD) as a stable key for grouping
+            const dateKey = isNaN(d) ? 'Unknown Date' : d.toISOString().split('T')[0];
+            if (!groups[dateKey]) groups[dateKey] = [];
+            groups[dateKey].push(item);
         });
         return groups;
     };
@@ -1719,7 +1733,14 @@ export default function App() {
                                 Object.entries(groupItemsByDate(filteredWasteItems, 'wasted_at')).map(([dateLabel, groupItems]) => (
                                     groupItems.length > 0 && (
                                         <div key={dateLabel} className="animate-in fade-in slide-in-from-bottom-2">
-                                            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 pl-2">{dateLabel}</h3>
+                                            <div className="flex justify-between items-center mb-3 px-2">
+                                                <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{dateLabel}</h3>
+                                                {dateLabel === 'Today' && (
+                                                    <p className="text-[8px] font-black text-emerald-500 uppercase tracking-tighter bg-emerald-50 px-2 py-0.5 rounded-full">
+                                                        Sorted by {sortBy} ({sortDirection === 'asc' ? 'ASC' : 'DSC'})
+                                                    </p>
+                                                )}
+                                            </div>
                                             <div className="space-y-3">
                                                 {groupItems.map(item => (
                                                     <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 relative">
@@ -1888,17 +1909,74 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {filteredItems.length === 0 ? (
-                                <div className="text-center py-20 opacity-40">
-                                    <Refrigerator className="w-12 h-12 mx-auto mb-4 stroke-1" />
-                                    <p className="font-bold">{t('fridge.empty')}</p>
-                                    <p className="text-sm">{t('fridge.adjust_filters')}</p>
+                            {/* Items List */}
+                            {(sortBy === 'price' || sortBy === 'name') ? (
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center mb-3 px-2">
+                                        <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">All Items</h3>
+                                        <p className="text-[8px] font-black text-emerald-500 uppercase tracking-tighter bg-emerald-50 px-2 py-0.5 rounded-full">
+                                            Sorted by {sortBy} ({sortDirection === 'asc' ? 'ASC' : 'DSC'})
+                                        </p>
+                                    </div>
+                                    {filteredItems.map(item => {
+                                        const isExpired = new Date(item.expiry) < new Date();
+                                        const daysLeft = Math.ceil((new Date(item.expiry) - new Date()) / (1000 * 60 * 60 * 24));
+                                        return (
+                                            <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 relative">
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${CATEGORIES[item.category]?.color || CATEGORIES.Other.color}`}>
+                                                    {item.emoji || CATEGORIES[item.category]?.icon || '📦'}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start">
+                                                        <p className="font-bold text-slate-800 text-sm truncate">
+                                                            {item.quantity > 1 && <span className="text-emerald-600 mr-1">x{item.quantity}</span>}
+                                                            {item.name}
+                                                        </p>
+                                                        <span className="font-bold text-slate-400 text-[10px]">${(parsePrice(item.price) * (item.quantity || 1))?.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <p className={`text-[10px] font-bold ${isExpired ? 'text-red-500' : daysLeft <= 3 ? 'text-amber-500' : 'text-slate-400'}`}>
+                                                            {isExpired ? 'Expired' : `${daysLeft} days left`}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.id ? null : item.id); }}
+                                                        className="p-2 text-slate-300 hover:text-slate-600 rounded-lg"
+                                                    >
+                                                        <MoreVertical size={16} />
+                                                    </button>
+                                                    {openMenuId === item.id && (
+                                                        <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-20 min-w-[140px] flex flex-col gap-1 animate-in fade-in zoom-in-95 origin-top-right">
+                                                            <button onClick={() => { setEditingItem(item); setEditType('fridge'); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-600">
+                                                                <Pencil size={14} /> {t('common.edit')}
+                                                            </button>
+                                                            <button onClick={() => { markConsumed(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-emerald-50 rounded-lg text-xs font-bold text-emerald-600">
+                                                                <CheckCircle2 size={14} /> {t('common.consume')}
+                                                            </button>
+                                                            <button onClick={() => { markWasted(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-red-50 rounded-lg text-xs font-bold text-red-500">
+                                                                <Trash2 size={14} /> {t('history.wasted')}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 Object.entries(groupItemsByDate(filteredItems)).map(([dateLabel, groupItems]) => (
                                     groupItems.length > 0 && (
                                         <div key={dateLabel} className="animate-in fade-in slide-in-from-bottom-2">
-                                            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 pl-2">{dateLabel}</h3>
+                                            <div className="flex justify-between items-center mb-3 px-2">
+                                                <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{dateLabel}</h3>
+                                                {dateLabel === 'Today' && (
+                                                    <p className="text-[8px] font-black text-emerald-500 uppercase tracking-tighter bg-emerald-50 px-2 py-0.5 rounded-full">
+                                                        Sorted by {sortBy} ({sortDirection === 'asc' ? 'ASC' : 'DSC'})
+                                                    </p>
+                                                )}
+                                            </div>
                                             <div className="space-y-3">
                                                 {groupItems.map(item => {
                                                     const isExpired = new Date(item.expiry) < new Date();
@@ -1966,7 +2044,7 @@ export default function App() {
                             {Object.entries(historyGroups).map(([date, items]) => (
                                 <div key={date}>
                                     <h3 className="sticky top-[140px] z-10 py-2 bg-slate-50/95 backdrop-blur text-xs font-black text-slate-400 uppercase tracking-widest pl-2 mb-2">
-                                        {new Date(date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                                        {date === 'Unknown Date' ? date : new Date(date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
                                     </h3>
                                     <div className="space-y-2">
                                         {items.map(item => (
