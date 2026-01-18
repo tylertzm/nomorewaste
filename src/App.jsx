@@ -1090,17 +1090,25 @@ export default function App() {
             return;
         }
 
-        // Delete all related data (cascade should handle this, but we'll be explicit)
-        const { error } = await supabase
-            .from('fridges')
-            .delete()
-            .eq('id', currentFridgeId);
+        try {
+            // Explicitly delete all related data in case cascade is missing
+            await supabase.from('items').delete().eq('fridge_id', currentFridgeId);
+            await supabase.from('waste_logs').delete().eq('fridge_id', currentFridgeId);
+            await supabase.from('consumed_logs').delete().eq('fridge_id', currentFridgeId);
+            await supabase.from('activity_logs').delete().eq('fridge_id', currentFridgeId);
+            await supabase.from('fridge_users').delete().eq('fridge_id', currentFridgeId);
 
-        if (error) {
-            alert('Error deleting fridge: ' + error.message);
-        } else {
+            const { error } = await supabase
+                .from('fridges')
+                .delete()
+                .eq('id', currentFridgeId);
+
+            if (error) throw error;
+
             alert('Fridge deleted successfully.');
             window.location.reload();
+        } catch (error) {
+            alert('Error deleting fridge: ' + error.message);
         }
     };
 
@@ -1187,8 +1195,9 @@ export default function App() {
         const groups = {};
         items.forEach(item => {
             const d = new Date(item.date);
+            const isValid = !isNaN(d.getTime());
             // Use ISO date (YYYY-MM-DD) as a stable key for grouping
-            const dateKey = isNaN(d) ? 'Unknown Date' : d.toISOString().split('T')[0];
+            const dateKey = isValid ? d.toISOString().split('T')[0] : 'Unknown Date';
             if (!groups[dateKey]) groups[dateKey] = [];
             groups[dateKey].push(item);
         });
@@ -2053,10 +2062,12 @@ export default function App() {
                                                     <span className="text-2xl">{CATEGORIES[item.category]?.icon || '📦'}</span>
                                                     <div>
                                                         <p className="font-black text-slate-800">{item.name}</p>
-                                                        <p className="text-xs text-slate-500 font-bold flex items-center gap-1">
+                                                        <p className="text-[10px] text-slate-500 font-bold flex items-center gap-1">
                                                             <span>{item.quantity}x</span>
                                                             <span className="text-slate-300">•</span>
-                                                            <span>${item.price}</span>
+                                                            <span>${parsePrice(item.price).toFixed(2)}</span>
+                                                            <span className="text-slate-300">•</span>
+                                                            <span className="bg-slate-50 px-1.5 py-0.5 rounded text-[9px]">{!isNaN(new Date(item.date).getTime()) ? new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
                                                         </p>
                                                     </div>
                                                 </div>
