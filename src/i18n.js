@@ -56,7 +56,8 @@ const translations = {
             limit: "Daily Limit Reached",
             generate: "Generate Recipe",
             online: "Ready to cook",
-            offline: "Off duty (Limit reached)"
+            offline: "Off duty (Limit reached)",
+            welcome: "Hello Chef! 👨‍🍳 I'm ready to cook. Tell me what you're craving, or pick a quick option below!"
         },
         settings: {
             title: "Settings",
@@ -67,6 +68,16 @@ const translations = {
             leave_fridge: "Leave Fridge",
             delete_fridge: "Permanently Delete Fridge",
             logout: "Sign Out"
+        },
+        onboarding: {
+            title: "Choose Language",
+            subtitle: "Select your preferred language",
+            welcome: "WELCOME! 👋",
+            setup: "Let's get your fridge set up.",
+            create: "Create New Fridge",
+            create_desc: "Start fresh for you or your family.",
+            join: "Join a Fridge",
+            join_desc: "Enter an invite code to connect."
         }
     },
     zh: {
@@ -126,7 +137,8 @@ const translations = {
             limit: "每日限制已满",
             generate: "生成食谱",
             online: "在线候命",
-            offline: "休息中 (额度已满)"
+            offline: "休息中 (额度已满)",
+            welcome: "主厨您好！👨‍🍳 我已经准备好烹饪了。告诉我想吃什么，或者选择下面的快捷选项！"
         },
         settings: {
             title: "设置",
@@ -137,6 +149,16 @@ const translations = {
             leave_fridge: "离开此冰箱",
             delete_fridge: "永久删除冰箱",
             logout: "退出登录"
+        },
+        onboarding: {
+            title: "选择语言",
+            subtitle: "请选择您偏好的语言",
+            welcome: "欢迎！👋",
+            setup: "让我们开始设置您的冰箱。",
+            create: "创建新冰箱",
+            create_desc: "为您或您的家人开启全新体验。",
+            join: "加入冰箱",
+            join_desc: "输入邀请码以进行连接。"
         }
     },
     ko: {
@@ -196,7 +218,8 @@ const translations = {
             limit: "일일 한도 도달",
             generate: "레시피 생성",
             online: "요리 준비 완료",
-            offline: "근무 종료 (한도 초과)"
+            offline: "근무 종료 (한도 초과)",
+            welcome: "셰프님 안녕하세요! 👨‍🍳 요리할 준비가 됐어요. 드시고 싶은 메뉴를 말씀하시거나 아래 옵션을 선택해 보세요!"
         },
         settings: {
             title: "설정",
@@ -207,6 +230,16 @@ const translations = {
             leave_fridge: "냉장고 나가기",
             delete_fridge: "냉장고 영구 삭제",
             logout: "로그아웃"
+        },
+        onboarding: {
+            title: "언어 선택",
+            subtitle: "사용하실 언어를 선택해 주세요",
+            welcome: "환영합니다! 👋",
+            setup: "냉장고 설정을 시작해 볼까요?",
+            create: "새로운 냉장고 만들기",
+            create_desc: "가족이나 나를 위한 새로운 시작.",
+            join: "냉장고 참여하기",
+            join_desc: "초대 코드를 입력하고 연결하세요."
         }
     },
     de: {
@@ -266,7 +299,8 @@ const translations = {
             limit: "Tageslimit erreicht",
             generate: "Rezept erstellen",
             online: "Bereit zum Kochen",
-            offline: "Außer Dienst (Limit erreicht)"
+            offline: "Außer Dienst (Limit erreicht)",
+            welcome: "Hallo Chef! 👨‍🍳 Ich bin bereit zum Kochen. Sag mir, worauf du Lust hast, oder wähle eine Option unten!"
         },
         settings: {
             title: "Einstellungen",
@@ -277,6 +311,16 @@ const translations = {
             leave_fridge: "Kühlschrank verlassen",
             delete_fridge: "Kühlschrank unwiderruflich löschen",
             logout: "Abmelden"
+        },
+        onboarding: {
+            title: "Sprache wählen",
+            subtitle: "Wähle deine bevorzugte Sprache",
+            welcome: "WILLKOMMEN! 👋",
+            setup: "Lass uns deinen Kühlschrank einrichten.",
+            create: "Neuen Kühlschrank erstellen",
+            create_desc: "Starte frisch für dich oder deine Familie.",
+            join: "Einem Kühlschrank beitreten",
+            join_desc: "Gib einen Einladungscode ein."
         }
     }
 };

@@ -148,9 +148,14 @@ export default function App() {
     }, [activeTab]);
 
     // Chat State
-    const [chatMessages, setChatMessages] = useState([
-        { id: '1', role: 'assistant', text: "Hello Chef! 👨‍🍳 I'm ready to cook. Tell me what you're craving, or pick a quick option below!" }
-    ]);
+    const [chatMessages, setChatMessages] = useState([]);
+    useEffect(() => {
+        if (chatMessages.length === 0) {
+            setChatMessages([
+                { id: '1', role: 'assistant', text: t('recipes.welcome') || "Hello Chef! 👨‍🍳 I'm ready to cook. Tell me what you're craving, or pick a quick option below!" }
+            ]);
+        }
+    }, [language]);
     const [chatInput, setChatInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef(null);
@@ -1284,10 +1289,10 @@ export default function App() {
                 <div className="max-w-md w-full space-y-8 animate-in fade-in zoom-in-95 duration-300">
                     <div className="text-center">
                         <h1 className="text-3xl font-black text-emerald-600 mb-2 uppercase">
-                            {onboardingStep === 'language' ? 'Choose Language' : 'WELCOME! 👋'}
+                            {onboardingStep === 'language' ? t('onboarding.title') : t('onboarding.welcome')}
                         </h1>
                         <p className="text-slate-500 font-bold">
-                            {onboardingStep === 'language' ? 'Select your preferred language' : t('onboarding.setup')}
+                            {onboardingStep === 'language' ? t('onboarding.subtitle') : t('onboarding.setup')}
                         </p>
                     </div>
 
@@ -1317,16 +1322,16 @@ export default function App() {
                                 <div className="bg-white/20 w-12 h-12 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
                                     <Plus size={24} className="text-white" />
                                 </div>
-                                <h3 className="text-lg font-black mb-1">Create New Fridge</h3>
-                                <p className="text-emerald-100 text-xs font-bold">Start fresh for you or your family.</p>
+                                <h3 className="text-lg font-black mb-1">{t('onboarding.create')}</h3>
+                                <p className="text-emerald-100 text-xs font-bold">{t('onboarding.create_desc')}</p>
                             </button>
 
                             <div className="bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200 border border-slate-100">
                                 <div className="bg-blue-50 w-12 h-12 rounded-2xl flex items-center justify-center mb-4">
                                     <Users size={24} className="text-blue-500" />
                                 </div>
-                                <h3 className="text-lg font-black text-slate-800 mb-1">Join a Fridge</h3>
-                                <p className="text-slate-400 text-xs font-bold mb-4">Enter an invite code to connect.</p>
+                                <h3 className="text-lg font-black text-slate-800 mb-1">{t('onboarding.join')}</h3>
+                                <p className="text-slate-400 text-xs font-bold mb-4">{t('onboarding.join_desc')}</p>
 
                                 <div className="flex gap-2">
                                     <input
