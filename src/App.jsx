@@ -667,7 +667,8 @@ export default function App() {
         const { error } = await supabase
             .from('items')
             .update(updates)
-            .eq('id', id);
+            .eq('id', id)
+            .eq('fridge_id', currentFridgeId);
 
         if (error) {
             console.error('Error updating item:', error);
@@ -693,7 +694,8 @@ export default function App() {
         const { error } = await supabase
             .from('waste_logs')
             .update(updates)
-            .eq('id', id);
+            .eq('id', id)
+            .eq('fridge_id', currentFridgeId);
 
         if (error) {
             console.error('Error updating waste log:', error);
@@ -707,7 +709,8 @@ export default function App() {
         const { error } = await supabase
             .from('consumed_logs')
             .update(updates)
-            .eq('id', id);
+            .eq('id', id)
+            .eq('fridge_id', currentFridgeId);
 
         if (error) {
             console.error('Error updating consumed log:', error);
