@@ -87,7 +87,7 @@ export default function Auth({ onLogin }) {
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="bg-transparent w-full outline-none font-bold text-slate-700 placeholder:text-slate-300"
+                                className="bg-transparent w-full outline-none font-bold text-slate-700 placeholder:text-slate-300 text-base"
                                 placeholder="you@example.com"
                                 required
                             />
@@ -102,7 +102,7 @@ export default function Auth({ onLogin }) {
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="bg-transparent w-full outline-none font-bold text-slate-700 placeholder:text-slate-300"
+                                className="bg-transparent w-full outline-none font-bold text-slate-700 placeholder:text-slate-300 text-base"
                                 placeholder="••••••••"
                                 required
                                 minLength={6}

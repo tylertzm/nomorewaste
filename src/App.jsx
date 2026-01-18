@@ -138,6 +138,7 @@ export default function App() {
     const [wastingItem, setWastingItem] = useState(null); // Item being processed for waste
     const [editingItem, setEditingItem] = useState(null);
     const [editType, setEditType] = useState(null); // 'fridge' or 'waste'
+    const [onboardingStep, setOnboardingStep] = useState('language'); // 'language', 'fridge'
 
     // Reset scroll to top on tab change
     useEffect(() => {
@@ -391,7 +392,10 @@ export default function App() {
             // Prepare items context
             const fridgeItems = items.map(i => `${i.name} (Qty: ${i.quantity || 1}, Expires: ${i.expiry})`).join(', ');
 
-            let systemPrompt = "You are a professional chef. Suggest 3 recipes based on the items in the user's fridge. Format each recipe with a title (starting with #), ingredients list (starting with ### Ingredients), and instructions (starting with ### Instructions). Use simple markdown.";
+            const languageNames = { en: 'English', zh: 'Chinese', ko: 'Korean', de: 'German' };
+            const currentLangName = languageNames[language] || 'English';
+
+            let systemPrompt = `You are a professional chef. Respond in ${currentLangName}. Suggest 3 recipes based on the items in the user's fridge. Format each recipe with a title (starting with #), ingredients list (starting with ### Ingredients), and instructions (starting with ### Instructions). Use simple markdown.`;
             let userPrompt = "";
 
             if (type === 'expiring') {
@@ -1279,43 +1283,66 @@ export default function App() {
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
                 <div className="max-w-md w-full space-y-8 animate-in fade-in zoom-in-95 duration-300">
                     <div className="text-center">
-                        <h1 className="text-3xl font-black text-emerald-600 mb-2">WELCOME! 👋</h1>
-                        <p className="text-slate-500 font-bold">Let's get your fridge set up.</p>
+                        <h1 className="text-3xl font-black text-emerald-600 mb-2 uppercase">
+                            {onboardingStep === 'language' ? 'Choose Language' : 'WELCOME! 👋'}
+                        </h1>
+                        <p className="text-slate-500 font-bold">
+                            {onboardingStep === 'language' ? 'Select your preferred language' : t('onboarding.setup')}
+                        </p>
                     </div>
 
-                    <div className="grid gap-4">
-                        <button
-                            onClick={createFridge}
-                            className="bg-emerald-600 text-white p-6 rounded-[2.5rem] shadow-xl shadow-emerald-200 hover:scale-[1.02] transition-all text-left group"
-                        >
-                            <div className="bg-white/20 w-12 h-12 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
-                                <Plus size={24} className="text-white" />
-                            </div>
-                            <h3 className="text-lg font-black mb-1">Create New Fridge</h3>
-                            <p className="text-emerald-100 text-xs font-bold">Start fresh for you or your family.</p>
-                        </button>
-
-                        <div className="bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200 border border-slate-100">
-                            <div className="bg-blue-50 w-12 h-12 rounded-2xl flex items-center justify-center mb-4">
-                                <Users size={24} className="text-blue-500" />
-                            </div>
-                            <h3 className="text-lg font-black text-slate-800 mb-1">Join a Fridge</h3>
-                            <p className="text-slate-400 text-xs font-bold mb-4">Enter an invite code to connect.</p>
-
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="Enter connection code..."
-                                    value={joinCode}
-                                    onChange={e => setJoinCode(e.target.value)}
-                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-emerald-500 text-sm"
-                                />
-                                <button onClick={handleJoinFridge} className="bg-slate-900 text-white px-6 rounded-xl font-black text-xs">
-                                    JOIN
+                    {onboardingStep === 'language' ? (
+                        <div className="grid grid-cols-2 gap-4">
+                            {[
+                                { code: 'en', label: 'English' },
+                                { code: 'zh', label: '中文' },
+                                { code: 'ko', label: '한국어' },
+                                { code: 'de', label: 'Deutsch' }
+                            ].map(lang => (
+                                <button
+                                    key={lang.code}
+                                    onClick={() => { setLanguage(lang.code); setOnboardingStep('fridge'); }}
+                                    className="bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-50 hover:scale-[1.02] transition-all text-center group"
+                                >
+                                    <h3 className="text-lg font-black text-slate-800">{lang.label}</h3>
                                 </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="grid gap-4">
+                            <button
+                                onClick={createFridge}
+                                className="bg-emerald-600 text-white p-6 rounded-[2.5rem] shadow-xl shadow-emerald-200 hover:scale-[1.02] transition-all text-left group"
+                            >
+                                <div className="bg-white/20 w-12 h-12 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                                    <Plus size={24} className="text-white" />
+                                </div>
+                                <h3 className="text-lg font-black mb-1">Create New Fridge</h3>
+                                <p className="text-emerald-100 text-xs font-bold">Start fresh for you or your family.</p>
+                            </button>
+
+                            <div className="bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200 border border-slate-100">
+                                <div className="bg-blue-50 w-12 h-12 rounded-2xl flex items-center justify-center mb-4">
+                                    <Users size={24} className="text-blue-500" />
+                                </div>
+                                <h3 className="text-lg font-black text-slate-800 mb-1">Join a Fridge</h3>
+                                <p className="text-slate-400 text-xs font-bold mb-4">Enter an invite code to connect.</p>
+
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Enter connection code..."
+                                        value={joinCode}
+                                        onChange={e => setJoinCode(e.target.value)}
+                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-emerald-500 text-base"
+                                    />
+                                    <button onClick={handleJoinFridge} className="bg-slate-900 text-white px-6 rounded-xl font-black text-xs">
+                                        JOIN
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     <button onClick={handleSignOut} className="w-full text-slate-400 text-xs font-bold hover:text-slate-600">
                         Sign Out
@@ -1431,7 +1458,7 @@ export default function App() {
                                             placeholder="Search items..."
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-base font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
                                         />
                                     </div>
 
@@ -1937,7 +1964,7 @@ export default function App() {
                                         onChange={(e) => setChatInput(e.target.value)}
                                         placeholder={dailyRecipeCount >= 2 ? "Daily limit reached..." : "Ask for a specific recipe..."}
                                         disabled={dailyRecipeCount >= 2 || isTyping}
-                                        className="flex-1 pl-4 py-2 bg-transparent text-sm font-bold text-slate-700 placeholder:text-slate-300 outline-none"
+                                        className="flex-1 pl-4 py-2 bg-transparent text-base font-bold text-slate-700 placeholder:text-slate-300 outline-none"
                                     />
                                     <button
                                         type="submit"
@@ -2247,7 +2274,7 @@ export default function App() {
                                                             <input
                                                                 value={item.name}
                                                                 onChange={(e) => updateDraft(item.id, 'name', e.target.value)}
-                                                                className="bg-white border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 outline-none w-full focus:border-emerald-500 transition-colors"
+                                                                className="bg-white border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 outline-none w-full focus:border-emerald-500 transition-colors text-base"
                                                                 placeholder="Item Name"
                                                             />
                                                         </div>
@@ -2259,17 +2286,17 @@ export default function App() {
                                                         <div>
                                                             <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Price ($)</label>
                                                             <input type="number" value={item.price} onChange={(e) => updateDraft(item.id, 'price', parseFloat(e.target.value))}
-                                                                className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
+                                                                className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-base font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
                                                         </div>
                                                         <div>
                                                             <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Qty</label>
                                                             <input type="number" value={item.quantity || 1} onChange={(e) => updateDraft(item.id, 'quantity', parseInt(e.target.value))}
-                                                                className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
+                                                                className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-base font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
                                                         </div>
                                                         <div>
                                                             <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Expiry</label>
                                                             <input type="date" value={item.expiry} onChange={(e) => updateDraft(item.id, 'expiry', e.target.value)}
-                                                                className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
+                                                                className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-base font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
                                                         </div>
                                                     </div>
                                                     <div>
@@ -2315,17 +2342,17 @@ export default function App() {
                             <form onSubmit={handleManualAddSubmit} className="space-y-4">
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Item Name</label>
-                                    <input name="name" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" placeholder="e.g. Milk" />
+                                    <input name="name" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none text-base" placeholder="e.g. Milk" />
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Quantity</label>
-                                        <input name="quantity" type="number" min="1" defaultValue="1" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" />
+                                        <input name="quantity" type="number" min="1" defaultValue="1" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none text-base" />
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Price ($)</label>
-                                        <input name="price" type="number" step="0.01" defaultValue="0.00" className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" />
+                                        <input name="price" type="number" step="0.01" defaultValue="0.00" className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none text-base" />
                                     </div>
                                 </div>
 
@@ -2422,7 +2449,7 @@ export default function App() {
                                             type="text"
                                             value={editingItem.name}
                                             onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                            className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-base font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
                                         />
                                     </div>
 
@@ -2433,7 +2460,7 @@ export default function App() {
                                                 type="number"
                                                 value={editingItem.quantity}
                                                 onChange={(e) => setEditingItem({ ...editingItem, quantity: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-base font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
                                             />
                                         </div>
                                         <div>
@@ -2443,7 +2470,7 @@ export default function App() {
                                                 step="0.01"
                                                 value={editingItem.price}
                                                 onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-base font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
                                             />
                                         </div>
                                     </div>
@@ -2454,7 +2481,7 @@ export default function App() {
                                             <select
                                                 value={editingItem.category}
                                                 onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                                                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-base font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
                                             >
                                                 {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                                             </select>
@@ -2466,7 +2493,7 @@ export default function App() {
                                                     type="date"
                                                     value={editingItem.expiry}
                                                     onChange={(e) => setEditingItem({ ...editingItem, expiry: e.target.value })}
-                                                    className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                                    className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-base font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
                                                 />
                                             </div>
                                         )}

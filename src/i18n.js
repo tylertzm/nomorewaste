@@ -1,25 +1,25 @@
 const translations = {
     en: {
         nav: {
-            home: "Home",
-            fridge: "Fridge",
+            home: "Dashboard",
+            fridge: "My Fridge",
             history: "History",
             recipes: "AI Chef",
             settings: "Settings"
         },
         common: {
-            add: "Add",
+            add: "Add Item",
             save: "Save",
             cancel: "Cancel",
             delete: "Delete",
-            consume: "Consume",
+            consume: "Eat it",
             scan: "Scan Receipt",
-            loading: "Loading...",
-            search: "Search items...",
+            loading: "Processing...",
+            search: "Search ingredients...",
             total: "Total",
             items: "items",
-            active_users: "Active Users",
-            edit: "Edit",
+            active_users: "Active Family",
+            edit: "Edit Details",
             wasted: "Wasted"
         },
         home: {
@@ -38,172 +38,172 @@ const translations = {
         },
         fridge: {
             title: "My Fridge",
-            empty: "Your fridge is empty. Scan a receipt to add items!",
+            empty: "Your fridge is empty! Scan a receipt to start tracking.",
             sort_by: "Sort by",
-            expiry: "Expiry",
+            expiry: "Expiry Date",
             category: "Category",
-            adjust_filters: "Try adjusting your filters"
+            adjust_filters: "Try changing your filters"
         },
         history: {
-            title: "History",
+            title: "Usage History",
             empty: "No consumption or waste recorded yet.",
             consumed: "Consumed",
             wasted: "Wasted"
         },
         recipes: {
             title: "AI Chef",
-            placeholder: "Ask me anything about your food...",
+            placeholder: "What should we cook today?",
             limit: "Daily Limit Reached",
             generate: "Generate Recipe",
-            online: "Online",
-            offline: "Off Duty (Limit Reached)"
+            online: "Ready to cook",
+            offline: "Off duty (Limit reached)"
         },
         settings: {
             title: "Settings",
-            language: "Language",
-            theme: "Theme",
-            account: "Account",
-            fridge_members: "Fridge Members",
+            language: "Language Settings",
+            theme: "Appearance",
+            account: "Account Profile",
+            fridge_members: "Shared Members",
             leave_fridge: "Leave Fridge",
-            delete_fridge: "Delete Fridge Permanently",
-            logout: "Logout"
+            delete_fridge: "Permanently Delete Fridge",
+            logout: "Sign Out"
         }
     },
     zh: {
         nav: {
-            home: "首页",
-            fridge: "冰箱",
-            history: "历史",
-            recipes: "AI 厨师",
-            settings: "设置"
+            home: "仪表盘",
+            fridge: "我的冰箱",
+            history: "使用历史",
+            recipes: "AI 大厨",
+            settings: "个人设置"
         },
         common: {
-            add: "添加",
+            add: "添加项目",
             save: "保存",
             cancel: "取消",
             delete: "删除",
-            consume: "消耗",
+            consume: "已食用",
             scan: "扫描小票",
-            loading: "加载中...",
-            search: "搜索食物...",
+            loading: "正在处理...",
+            search: "搜索食材...",
             total: "总计",
             items: "件商品",
-            active_users: "活跃用户",
-            edit: "编辑",
+            active_users: "家庭成员",
+            edit: "编辑详情",
             wasted: "已浪费"
         },
         home: {
             welcome: "欢迎回来！",
             stats: {
-                items_count: "冰箱食物",
+                items_count: "冰箱现存",
                 expiring_soon: "即将过期",
                 total_spent: "累计支出",
-                waste_prevented: "避免浪费",
+                waste_prevented: "成功节省",
                 total_wasted: "浪费金额",
                 weekly: "本周",
                 monthly: "本月",
-                all_time: "总计"
+                all_time: "所有时间"
             },
             activity: "最近动态"
         },
         fridge: {
             title: "我的冰箱",
-            empty: "冰箱是空的。扫描小票开始添加吧！",
+            empty: "你的冰箱空空如也，扫个小票加点料吧！",
             sort_by: "排序方式",
             expiry: "过期时间",
             category: "类别",
             adjust_filters: "尝试调整筛选条件"
         },
         history: {
-            title: "历史记录",
-            empty: "尚未记录消费或浪费。",
-            consumed: "已消耗",
+            title: "使用历史",
+            empty: "还没有任何食用或浪费记录。",
+            consumed: "已食用",
             wasted: "已浪费"
         },
         recipes: {
-            title: "AI 厨师",
-            placeholder: "问我关于你冰箱里的任何事...",
-            limit: "已达每日限制",
+            title: "AI 大厨",
+            placeholder: "今天想做点什么好吃的？",
+            limit: "每日限制已满",
             generate: "生成食谱",
-            online: "在线",
-            offline: "休息中 (已达限制)"
+            online: "在线候命",
+            offline: "休息中 (额度已满)"
         },
         settings: {
             title: "设置",
-            language: "语言选择",
-            theme: "主题",
-            account: "账号",
+            language: "多语言支持",
+            theme: "外观主题",
+            account: "账户资料",
             fridge_members: "冰箱成员",
-            leave_fridge: "离开冰箱",
+            leave_fridge: "离开此冰箱",
             delete_fridge: "永久删除冰箱",
             logout: "退出登录"
         }
     },
     ko: {
         nav: {
-            home: "홈",
-            fridge: "냉장고",
-            history: "기록",
+            home: "대시보드",
+            fridge: "나의 냉장고",
+            history: "사용 기록",
             recipes: "AI 셰프",
             settings: "설정"
         },
         common: {
-            add: "추가",
-            save: "저장",
+            add: "항목 추가",
+            save: "저장하기",
             cancel: "취소",
-            delete: "삭제",
-            consume: "소비",
+            delete: "삭제하기",
+            consume: "먹었어요",
             scan: "영수증 스캔",
-            loading: "로딩 중...",
-            search: "품목 검색...",
-            total: "총",
+            loading: "처리 중...",
+            search: "식재료 검색...",
+            total: "합계",
             items: "개",
-            active_users: "활성 사용자",
-            edit: "편집",
-            wasted: "낭비됨"
+            active_users: "함께하는 가족",
+            edit: "편집하기",
+            wasted: "버려짐"
         },
         home: {
-            welcome: "다시 오신 것을 환영합니다!",
+            welcome: "반가워요!",
             stats: {
-                items_count: "냉장고 품목",
+                items_count: "냉장고 속 음식",
                 expiring_soon: "유통기한 임박",
                 total_spent: "총 지출액",
-                waste_prevented: "낭비 방지",
-                total_wasted: "낭비 금액",
+                waste_prevented: "절약한 비용",
+                total_wasted: "낭비된 가치",
                 weekly: "이번 주",
                 monthly: "이번 달",
-                all_time: "전체"
+                all_time: "전체 기간"
             },
             activity: "최근 활동"
         },
         fridge: {
             title: "나의 냉장고",
-            empty: "냉장고가 비어 있습니다. 영수증을 스캔하여 품목을 추가하세요!",
+            empty: "냉장고가 비어있어요. 영수증을 스캔해볼까요?",
             sort_by: "정렬 기준",
             expiry: "유통기한",
             category: "카테고리",
-            adjust_filters: "필터를 조정해 보세요"
+            adjust_filters: "필터를 조정해보세요"
         },
         history: {
-            title: "기록",
-            empty: "아직 소비 또는 낭비 기록이 없습니다.",
-            consumed: "소비됨",
+            title: "사용 내역",
+            empty: "아직 기록된 내용이 없습니다.",
+            consumed: "소비 완료",
             wasted: "낭비됨"
         },
         recipes: {
             title: "AI 셰프",
-            placeholder: "음식에 대해 무엇이든 물어보세요...",
-            limit: "일일 한도 초과",
+            placeholder: "오늘은 어떤 음식을 만들까요?",
+            limit: "일일 한도 도달",
             generate: "레시피 생성",
-            online: "온라인",
+            online: "요리 준비 완료",
             offline: "근무 종료 (한도 초과)"
         },
         settings: {
             title: "설정",
-            language: "언어 설정",
-            theme: "테마",
-            account: "계정",
-            fridge_members: "냉장고 멤버",
+            language: "언어 선택",
+            theme: "화면 설정",
+            account: "계정 프로필",
+            fridge_members: "공유 멤버",
             leave_fridge: "냉장고 나가기",
             delete_fridge: "냉장고 영구 삭제",
             logout: "로그아웃"
@@ -211,10 +211,10 @@ const translations = {
     },
     de: {
         nav: {
-            home: "Start",
-            fridge: "Kühlschrank",
+            home: "Übersicht",
+            fridge: "Mein Kühlschrank",
             history: "Verlauf",
-            recipes: "KI-Koch",
+            recipes: "KI-Chef",
             settings: "Einstellungen"
         },
         common: {
@@ -222,13 +222,13 @@ const translations = {
             save: "Speichern",
             cancel: "Abbrechen",
             delete: "Löschen",
-            consume: "Aufbrauchen",
+            consume: "Gegessen",
             scan: "Beleg scannen",
-            loading: "Laden...",
-            search: "Suchen...",
+            loading: "Wird verarbeitet...",
+            search: "Zutaten suchen...",
             total: "Gesamt",
             items: "Artikel",
-            active_users: "Aktive Nutzer",
+            active_users: "Aktive Familie",
             edit: "Bearbeiten",
             wasted: "Verschwendet"
         },
@@ -239,20 +239,20 @@ const translations = {
                 expiring_soon: "Bald ablaufend",
                 total_spent: "Gesamtausgaben",
                 waste_prevented: "Abfall vermieden",
-                total_wasted: "Wert verschwendet",
-                weekly: "Wöchentlich",
-                monthly: "Monatlich",
-                all_time: "Gesamt"
+                total_wasted: "Verlustwert",
+                weekly: "Diese Woche",
+                monthly: "Dieser Monat",
+                all_time: "Gesamte Zeit"
             },
             activity: "Letzte Aktivitäten"
         },
         fridge: {
             title: "Mein Kühlschrank",
-            empty: "Dein Kühlschrank ist leer. Scanne einen Beleg, um Artikel hinzuzufügen!",
+            empty: "Dein Kühlschrank ist leer! Scanne einen Beleg, um zu starten.",
             sort_by: "Sortieren nach",
             expiry: "Ablaufdatum",
             category: "Kategorie",
-            adjust_filters: "Probiere andere Filter aus"
+            adjust_filters: "Versuche, die Filter anzupassen"
         },
         history: {
             title: "Verlauf",
@@ -261,21 +261,21 @@ const translations = {
             wasted: "Verschwendet"
         },
         recipes: {
-            title: "KI-Koch",
-            placeholder: "Frag mich etwas über dein Essen...",
+            title: "KI-Chef",
+            placeholder: "Was kochen wir heute?",
             limit: "Tageslimit erreicht",
-            generate: "Rezept generieren",
-            online: "Online",
+            generate: "Rezept erstellen",
+            online: "Bereit zum Kochen",
             offline: "Außer Dienst (Limit erreicht)"
         },
         settings: {
             title: "Einstellungen",
-            language: "Sprache",
-            theme: "Design",
-            account: "Konto",
-            fridge_members: "Kühlschrank-Mitglieder",
+            language: "Spracheinstellungen",
+            theme: "Erscheinungsbild",
+            account: "Profil",
+            fridge_members: "Geteilte Mitglieder",
             leave_fridge: "Kühlschrank verlassen",
-            delete_fridge: "Kühlschrank dauerhaft löschen",
+            delete_fridge: "Kühlschrank unwiderruflich löschen",
             logout: "Abmelden"
         }
     }
