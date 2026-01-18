@@ -139,6 +139,13 @@ export default function App() {
     const [editingItem, setEditingItem] = useState(null);
     const [editType, setEditType] = useState(null); // 'fridge' or 'waste'
 
+    // Reset scroll to top on tab change
+    useEffect(() => {
+        window.scrollTo(0, 0);
+        const main = document.querySelector('main');
+        if (main) main.scrollTo(0, 0);
+    }, [activeTab]);
+
     // Chat State
     const [chatMessages, setChatMessages] = useState([
         { id: '1', role: 'assistant', text: "Hello Chef! 👨‍🍳 I'm ready to cook. Tell me what you're craving, or pick a quick option below!" }
@@ -671,6 +678,17 @@ export default function App() {
         }
     };
 
+    const deleteItem = async (id, name) => {
+        if (!window.confirm(`Delete ${name || 'item'} permanently?`)) return;
+        const { error } = await supabase.from('items').delete().eq('id', id);
+        if (error) {
+            alert('Error deleting item: ' + error.message);
+        } else {
+            await logActivity('DELETE', name || id, 'Permanently deleted item');
+            refreshData(currentFridgeId);
+        }
+    };
+
     const updateWasteLog = async (id, updates) => {
         const { error } = await supabase
             .from('waste_logs')
@@ -743,7 +761,7 @@ export default function App() {
         if (!editingItem) return;
 
         const quantity = parseInt(editingItem.quantity);
-        const price = parseFloat(editingItem.price);
+        const price = parsePrice(editingItem.price);
 
         if (isNaN(quantity) || isNaN(price)) {
             alert("Please enter valid numbers for quantity and price.");
@@ -1967,6 +1985,9 @@ export default function App() {
                                                             <button onClick={() => { markWasted(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-red-50 rounded-lg text-xs font-bold text-red-500">
                                                                 <Trash2 size={14} /> {t('history.wasted')}
                                                             </button>
+                                                            <button onClick={() => { deleteItem(item.id, item.name); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-slate-100 rounded-lg text-xs font-bold text-slate-500 border-t border-slate-50">
+                                                                <X size={14} /> {t('common.delete')}
+                                                            </button>
                                                         </div>
                                                     )}
                                                 </div>
@@ -2028,6 +2049,9 @@ export default function App() {
                                                                         </button>
                                                                         <button onClick={() => { markWasted(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-red-50 rounded-lg text-xs font-bold text-red-500">
                                                                             <Trash2 size={14} /> {t('history.wasted')}
+                                                                        </button>
+                                                                        <button onClick={() => { deleteItem(item.id, item.name); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-slate-100 rounded-lg text-xs font-bold text-slate-500 border-t border-slate-50">
+                                                                            <X size={14} /> {t('common.delete')}
                                                                         </button>
                                                                     </div>
                                                                 )}
