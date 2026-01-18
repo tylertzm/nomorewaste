@@ -222,15 +222,18 @@ export default function App() {
     // Computed Stats
     const filteredWaste = wasteHistory.filter(item => {
         if (statsFilter === 'all') return true;
-        const wastedDate = new Date(item.wastedAt || item.wasted_at);
+        const d = item.wasted_at || item.wastedAt || item.created_at;
+        if (!d) return true;
+        const wastedDate = new Date(d);
+        if (isNaN(wastedDate)) return true;
         const now = new Date();
         if (statsFilter === 'week') {
-            const d = new Date(); d.setDate(now.getDate() - 7);
-            return wastedDate >= d;
+            const range = new Date(); range.setDate(now.getDate() - 7);
+            return wastedDate >= range;
         }
         if (statsFilter === 'month') {
-            const d = new Date(); d.setDate(now.getDate() - 30);
-            return wastedDate >= d;
+            const range = new Date(); range.setDate(now.getDate() - 30);
+            return wastedDate >= range;
         }
         return true;
     });
@@ -1114,10 +1117,15 @@ export default function App() {
                 return matchesSearch && matchesCategory;
             })
             .sort((a, b) => {
+                const parsePrice = (p) => {
+                    if (typeof p === 'number') return p;
+                    return parseFloat(String(p || '0').replace(/[^0-9.]/g, '')) || 0;
+                };
+
                 if (sortBy === 'expiry') return new Date(a.expiry || '9999-12-31') - new Date(b.expiry || '9999-12-31');
                 if (sortBy === 'created_at') return new Date(b[dateKey] || b.created_at) - new Date(a[dateKey] || a.created_at);
-                if (sortBy === 'price') return b.price - a.price;
-                if (sortBy === 'name') return a.name.localeCompare(b.name);
+                if (sortBy === 'price') return parsePrice(b.price) - parsePrice(a.price);
+                if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
                 return 0;
             });
     };
@@ -1133,7 +1141,7 @@ export default function App() {
             items = [...items, ...wasteHistory.map(i => ({
                 ...i,
                 type: 'waste',
-                date: i.wasted_at || i.wastedAt,
+                date: i.wasted_at || i.created_at || new Date().toISOString(),
                 uniqueId: `waste-${i.id}`
             }))];
         }
@@ -1141,7 +1149,7 @@ export default function App() {
             items = [...items, ...consumedHistory.map(i => ({
                 ...i,
                 type: 'consumed',
-                date: i.consumed_at,
+                date: i.consumed_at || i.created_at || new Date().toISOString(),
                 uniqueId: `consumed-${i.id}`
             }))];
         }
@@ -1161,9 +1169,10 @@ export default function App() {
     const groupHistoryByDate = (items) => {
         const groups = {};
         items.forEach(item => {
-            const date = new Date(item.date).toLocaleDateString();
-            if (!groups[date]) groups[date] = [];
-            groups[date].push(item);
+            const d = new Date(item.date);
+            const dateStr = isNaN(d) ? 'Unknown Date' : d.toLocaleDateString();
+            if (!groups[dateStr]) groups[dateStr] = [];
+            groups[dateStr].push(item);
         });
         return groups;
     };
@@ -1715,7 +1724,10 @@ export default function App() {
                                                             </div>
                                                             <div className="flex items-center gap-2 mt-1">
                                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                    Wasted: {new Date(item.wastedAt || item.wasted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                    Wasted: {(() => {
+                                                                        const d = new Date(item.wasted_at || item.wastedAt || item.created_at);
+                                                                        return isNaN(d) ? 'N/A' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                                                    })()}
                                                                 </p>
                                                             </div>
                                                         </div>
