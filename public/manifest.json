@@ -1,0 +1,17 @@
+{
+    "name": "Spoiless Bills",
+    "short_name": "Spoiless",
+    "description": "Smart Fridge Management with AI Receipt Scanning",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#10b981",
+    "icons": [
+        {
+            "src": "/src/spoilessbillslogo.webp",
+            "sizes": "512x512",
+            "type": "image/webp",
+            "purpose": "any maskable"
+        }
+    ]
+}

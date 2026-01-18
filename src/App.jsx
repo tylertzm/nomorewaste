@@ -118,15 +118,15 @@ export default function App() {
     const [isManualAddOpen, setIsManualAddOpen] = useState(false);
     const [manualAddType, setManualAddType] = useState('fridge'); // fridge, waste, consumed
 
-    // Notification State
-    const [activityLogs, setActivityLogs] = useState([]);
+    // Unified Fridge ID State
     const [currentFridgeId, setCurrentFridgeId] = useState(null);
+    const [activityLogs, setActivityLogs] = useState([]);
 
     // History Tab State
     const [historyFilter, setHistoryFilter] = useState('all'); // all, waste, consumed
 
     // Filter Stats
-    const [statsFilter, setStatsFilter] = useState('all'); // all, month, weekar
+    const [statsFilter, setStatsFilter] = useState('week'); // Default to week
     const [searchQuery, setSearchQuery] = useState('');
     const [filterCategory, setFilterCategory] = useState('All');
     const [sortBy, setSortBy] = useState('expiry'); // expiry, created_at, price, name
@@ -157,7 +157,6 @@ export default function App() {
     const [draftItems, setDraftItems] = useState([]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [fridgeName, setFridgeName] = useState('My Fridge');
-    const [fridgeId, setFridgeId] = useState(null);
     const [inviteCode, setInviteCode] = useState('');
     const [inviteCodeExpiry, setInviteCodeExpiry] = useState(null);
     const [fridgeMembers, setFridgeMembers] = useState([]);
@@ -254,6 +253,9 @@ export default function App() {
     const filteredTotalWasted = filteredWaste.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
     const filteredTotalSavings = filteredConsumed.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
 
+    // All Time Stats (Unfiltered)
+    const totalWastedAllTime = wasteHistory.reduce((acc, curr) => acc + ((curr.price || 0) * (curr.quantity || 1)), 0);
+
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
@@ -268,13 +270,13 @@ export default function App() {
         return () => subscription.unsubscribe();
     }, []);
 
-    const refreshData = async (currentFridgeId = fridgeId) => {
-        if (!currentFridgeId) return;
+    const refreshData = async (fId = currentFridgeId) => {
+        if (!fId) return;
 
         const { data: itemsData } = await supabase
             .from('items')
             .select('*')
-            .eq('fridge_id', currentFridgeId)
+            .eq('fridge_id', fId)
             .order('created_at', { ascending: false });
 
         if (itemsData) setItems(itemsData);
@@ -282,7 +284,7 @@ export default function App() {
         const { data: wasteData } = await supabase
             .from('waste_logs')
             .select('*')
-            .eq('fridge_id', currentFridgeId)
+            .eq('fridge_id', fId)
             .order('wasted_at', { ascending: false });
 
         if (wasteData) setWasteHistory(wasteData);
@@ -290,7 +292,7 @@ export default function App() {
         const { data: consumedData } = await supabase
             .from('consumed_logs')
             .select('*')
-            .eq('fridge_id', currentFridgeId)
+            .eq('fridge_id', fId)
             .order('consumed_at', { ascending: false });
 
         if (consumedData) setConsumedHistory(consumedData);
@@ -438,7 +440,6 @@ export default function App() {
             setView('app');
 
             const fridgeIdLocal = fridgeUser.fridge_id;
-            setFridgeId(fridgeIdLocal);
             setCurrentFridgeId(fridgeIdLocal);
 
             // Fetch Fridge Details
@@ -923,7 +924,7 @@ export default function App() {
     };
 
     const generateCode = async () => {
-        if (!fridgeId) {
+        if (!currentFridgeId) {
             alert("Error: No fridge ID found. Please refresh.");
             return;
         }
@@ -935,7 +936,7 @@ export default function App() {
         const { error } = await supabase
             .from('fridges')
             .update({ invite_code: newCode, invite_code_expiry: expiry })
-            .eq('id', fridgeId)
+            .eq('id', currentFridgeId)
             .select();
 
         if (error) {
@@ -960,13 +961,13 @@ export default function App() {
     };
 
     const fetchFridgeMembers = async () => {
-        if (!fridgeId) return;
+        if (!currentFridgeId) return;
 
         // Get all user_ids for this fridge
         const { data: fridgeUsers, error: fridgeError } = await supabase
             .from('fridge_users')
             .select('user_id')
-            .eq('fridge_id', fridgeId);
+            .eq('fridge_id', currentFridgeId);
 
         if (fridgeError) {
             console.error('Error fetching fridge users:', fridgeError);
@@ -989,7 +990,7 @@ export default function App() {
     };
 
     const leaveFridge = async () => {
-        if (!fridgeId || !session?.user?.id) return;
+        if (!currentFridgeId || !session?.user?.id) return;
 
         const confirmed = window.confirm('Are you sure you want to leave this fridge? You will lose access to all items.');
         if (!confirmed) return;
@@ -1001,7 +1002,7 @@ export default function App() {
         const { error } = await supabase
             .from('fridge_users')
             .delete()
-            .eq('fridge_id', fridgeId)
+            .eq('fridge_id', currentFridgeId)
             .eq('user_id', session.user.id);
 
         if (error) {
@@ -1013,7 +1014,7 @@ export default function App() {
     };
 
     const deleteFridge = async () => {
-        if (!fridgeId) return;
+        if (!currentFridgeId) return;
 
         const confirmed = window.confirm('⚠️ DELETE FRIDGE PERMANENTLY?\n\nThis will delete:\n- All items\n- All history (waste & consumed)\n- All activity logs\n- Remove all members\n\nThis action cannot be undone!');
         if (!confirmed) return;
@@ -1028,7 +1029,7 @@ export default function App() {
         const { error } = await supabase
             .from('fridges')
             .delete()
-            .eq('id', fridgeId);
+            .eq('id', currentFridgeId);
 
         if (error) {
             alert('Error deleting fridge: ' + error.message);
@@ -1405,18 +1406,19 @@ export default function App() {
                                 {/* Middle: Split Grid */}
                                 <div className="grid grid-cols-2 gap-4">
                                     {/* Wasted */}
-                                    <div className="p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex flex-col justify-between h-auto min-h-[128px]">
+                                    <div className="p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex flex-col justify-between h-auto min-h-[140px] hover-lift transition-all">
                                         <div className="w-10 h-10 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-2">
                                             <Trash2 size={20} />
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-black uppercase text-slate-400">{t('home.stats.waste_prevented')}</p>
                                             <p className="text-2xl font-black text-slate-800">${filteredTotalWasted.toFixed(2)}</p>
+                                            <p className="text-[8px] font-bold text-red-400 mt-1">ALL TIME: ${totalWastedAllTime.toFixed(2)}</p>
                                         </div>
                                     </div>
 
                                     {/* Savings/Consumed */}
-                                    <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-[2rem] flex flex-col justify-between h-auto min-h-[128px]">
+                                    <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-[2rem] flex flex-col justify-between h-auto min-h-[140px] hover-lift transition-all">
                                         <div className="w-10 h-10 bg-white text-emerald-500 rounded-full flex items-center justify-center mb-2 shadow-sm">
                                             <CheckCircle2 size={20} />
                                         </div>
