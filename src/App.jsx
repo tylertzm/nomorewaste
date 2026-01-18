@@ -702,9 +702,6 @@ export default function App() {
             } else {
                 await supabase.from('items').delete().eq('id', id);
             }
-
-            // Refresh to be safe
-            refreshData(fridgeUser.fridge_id);
         }
     };
 
@@ -1659,7 +1656,10 @@ export default function App() {
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-1">
                                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                Consumed: {new Date(item.consumed_at || item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                Consumed: {(() => {
+                                                                    const date = new Date(item.consumed_at || item.created_at);
+                                                                    return isNaN(date.getTime()) ? 'Unknown' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                                                })()}
                                                             </p>
                                                         </div>
                                                     </div>
