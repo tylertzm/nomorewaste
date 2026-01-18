@@ -250,8 +250,29 @@ export default function App() {
         return true;
     });
 
+    const filteredFridge = items.filter(item => {
+        if (statsFilter === 'all') return true;
+        const addedDate = new Date(item.created_at);
+        const now = new Date();
+        if (statsFilter === 'week') {
+            const d = new Date(); d.setDate(now.getDate() - 7);
+            return addedDate >= d;
+        }
+        if (statsFilter === 'month') {
+            const d = new Date(); d.setDate(now.getDate() - 30);
+            return addedDate >= d;
+        }
+        return true;
+    });
+
     const filteredTotalWasted = filteredWaste.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
-    const filteredTotalSavings = filteredConsumed.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
+    const filteredTotalConsumed = filteredConsumed.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
+    const filteredTotalFridge = filteredFridge.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
+    const filteredTotalSpent = filteredTotalFridge + filteredTotalWasted + filteredTotalConsumed;
+
+    const totalProcessed = filteredTotalConsumed + filteredTotalWasted;
+    const wasteRatio = totalProcessed > 0 ? (filteredTotalWasted / totalProcessed) * 100 : 0;
+    const consumeRatio = totalProcessed > 0 ? (filteredTotalConsumed / totalProcessed) * 100 : 0;
 
     // All Time Stats (Unfiltered)
     const totalWastedAllTime = wasteHistory.reduce((acc, curr) => acc + ((curr.price || 0) * (curr.quantity || 1)), 0);
@@ -1445,27 +1466,57 @@ export default function App() {
 
                                 {/* Middle: Split Grid */}
                                 <div className="grid grid-cols-2 gap-4">
-                                    {/* Wasted */}
-                                    <div className="p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex flex-col justify-between h-auto min-h-[140px] hover-lift transition-all">
-                                        <div className="w-10 h-10 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-2">
-                                            <Trash2 size={20} />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase text-slate-400">{t('home.stats.waste_prevented')}</p>
-                                            <p className="text-2xl font-black text-slate-800">${filteredTotalWasted.toFixed(2)}</p>
-                                            <p className="text-[8px] font-bold text-red-400 mt-1">ALL TIME: ${totalWastedAllTime.toFixed(2)}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Savings/Consumed */}
+                                    {/* Waste Prevented (Consumed) */}
                                     <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-[2rem] flex flex-col justify-between h-auto min-h-[140px] hover-lift transition-all">
                                         <div className="w-10 h-10 bg-white text-emerald-500 rounded-full flex items-center justify-center mb-2 shadow-sm">
                                             <CheckCircle2 size={20} />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-black uppercase text-emerald-500">{t('home.stats.saved_money')}</p>
-                                            <p className="text-2xl font-black text-emerald-700">${filteredTotalSavings.toFixed(2)}</p>
+                                            <p className="text-[10px] font-black uppercase text-emerald-500">{t('home.stats.waste_prevented')}</p>
+                                            <p className="text-2xl font-black text-emerald-700">${filteredTotalConsumed.toFixed(2)}</p>
                                         </div>
+                                    </div>
+
+                                    {/* Total Spend */}
+                                    <div className="p-5 bg-slate-900 border border-slate-800 rounded-[2rem] flex flex-col justify-between h-auto min-h-[140px] hover-lift transition-all shadow-xl shadow-slate-200">
+                                        <div className="w-10 h-10 bg-white/10 text-white rounded-full flex items-center justify-center mb-2">
+                                            <div className="text-xl font-bold">$</div>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase text-slate-400">{t('home.stats.total_spent')}</p>
+                                            <p className="text-2xl font-black text-white">${filteredTotalSpent.toFixed(2)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Efficiency Ratio Bar */}
+                                <div className="w-full bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm space-y-3">
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Kitchen Efficiency</p>
+                                            <h4 className="text-xl font-black text-slate-800">{consumeRatio.toFixed(0)}% Utilized</h4>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-black uppercase text-red-400 tracking-widest mb-1">Waste Ratio</p>
+                                            <p className="text-lg font-black text-red-500">{wasteRatio.toFixed(0)}%</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Dual Progress Bar */}
+                                    <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                                        <div
+                                            className="h-full bg-emerald-500 transition-all duration-1000 ease-out"
+                                            style={{ width: `${consumeRatio}%` }}
+                                        />
+                                        <div
+                                            className="h-full bg-red-400 transition-all duration-1000 ease-out"
+                                            style={{ width: `${wasteRatio}%` }}
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-between text-[8px] font-black text-slate-400 uppercase tracking-tighter">
+                                        <span>Consumed: ${filteredTotalConsumed.toFixed(2)}</span>
+                                        <span>Wasted: ${filteredTotalWasted.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>

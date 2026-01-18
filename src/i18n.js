@@ -27,8 +27,9 @@ const translations = {
             stats: {
                 items_count: "Items in Fridge",
                 expiring_soon: "Expiring Soon",
-                saved_money: "Monthly Savings",
+                total_spent: "Total Spend",
                 waste_prevented: "Waste Prevented",
+                total_wasted: "Value Wasted",
                 weekly: "Weekly",
                 monthly: "Monthly",
                 all_time: "All Time"
@@ -96,8 +97,9 @@ const translations = {
             stats: {
                 items_count: "冰箱食物",
                 expiring_soon: "即将过期",
-                saved_money: "本月节省",
-                waste_prevented: "减少浪费",
+                total_spent: "累计支出",
+                waste_prevented: "避免浪费",
+                total_wasted: "浪费金额",
                 weekly: "本周",
                 monthly: "本月",
                 all_time: "总计"
@@ -165,8 +167,9 @@ const translations = {
             stats: {
                 items_count: "냉장고 품목",
                 expiring_soon: "유통기한 임박",
-                saved_money: "이번 달 절약",
-                waste_prevented: "방지된 낭비",
+                total_spent: "총 지출액",
+                waste_prevented: "낭비 방지",
+                total_wasted: "낭비 금액",
                 weekly: "이번 주",
                 monthly: "이번 달",
                 all_time: "전체"
@@ -234,8 +237,9 @@ const translations = {
             stats: {
                 items_count: "Artikel im Kühlschrank",
                 expiring_soon: "Bald ablaufend",
-                saved_money: "Monatl. Ersparnis",
+                total_spent: "Gesamtausgaben",
                 waste_prevented: "Abfall vermieden",
+                total_wasted: "Wert verschwendet",
                 weekly: "Wöchentlich",
                 monthly: "Monatlich",
                 all_time: "Gesamt"
