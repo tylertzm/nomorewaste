@@ -140,6 +140,12 @@ export default function App() {
     const [editType, setEditType] = useState(null); // 'fridge' or 'waste'
     const [onboardingStep, setOnboardingStep] = useState('language'); // 'language', 'fridge'
 
+    useEffect(() => {
+        if (currentFridgeId) {
+            refreshData(currentFridgeId);
+        }
+    }, [sortBy, sortDirection, currentFridgeId]);
+
     // Reset scroll to top on tab change
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -311,11 +317,23 @@ export default function App() {
     const refreshData = async (fId = currentFridgeId) => {
         if (!fId) return;
 
-        const { data: itemsData } = await supabase
+        let query = supabase
             .from('items')
             .select('*')
-            .eq('fridge_id', fId)
-            .order('created_at', { ascending: false });
+            .eq('fridge_id', fId);
+
+        // Apply dynamic sorting via SQL
+        if (sortBy === 'price') {
+            query = query.order('price', { ascending: sortDirection === 'asc' });
+        } else if (sortBy === 'expiry') {
+            query = query.order('expiry', { ascending: sortDirection === 'asc', nullsFirst: false });
+        } else if (sortBy === 'name') {
+            query = query.order('name', { ascending: sortDirection === 'asc' });
+        } else {
+            query = query.order('created_at', { ascending: sortDirection === 'asc' });
+        }
+
+        const { data: itemsData } = await query;
 
         if (itemsData) setItems(itemsData);
 
@@ -548,6 +566,8 @@ export default function App() {
                 .subscribe();
 
             // Real-time Subscription - Consumed Logs
+
+            // Cleanup Logic for Channels (if missing)
             const consumedChannel = supabase
                 .channel('consumed_realtime')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'consumed_logs', filter: `fridge_id=eq.${fridgeIdLocal}` }, (payload) => {
@@ -1202,16 +1222,8 @@ export default function App() {
                 const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
                 const matchesCategory = filterCategory === 'All' || item.category === filterCategory;
                 return matchesSearch && matchesCategory;
-            })
-            .sort((a, b) => {
-                let comparison = 0;
-                if (sortBy === 'price') comparison = parsePrice(a.price) - parsePrice(b.price);
-                else if (sortBy === 'expiry') comparison = new Date(a.expiry || '9999-12-31') - new Date(b.expiry || '9999-12-31');
-                else if (sortBy === 'name') comparison = (a.name || '').localeCompare(b.name || '');
-                else comparison = new Date(a[dateKey] || a.created_at || 0) - new Date(b[dateKey] || b.created_at || 0);
-
-                return sortDirection === 'asc' ? comparison : -comparison;
             });
+        // Removed UI-side .sort() as it's now handled by SQL in refreshData
     };
 
     const filteredItems = getFilteredList(items, 'created_at');
