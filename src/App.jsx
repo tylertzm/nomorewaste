@@ -596,7 +596,7 @@ export default function App() {
 
     const analyzeReceipt = async (originalBase64) => {
         const base64Data = await resizeImage(originalBase64);
-        const systemPrompt = "You are a grocery receipt parser. Extract items into a JSON array. For each item include: 'name', 'price' (number), 'quantity' (integer, default 1), 'category' (Produce, Dairy, Meat, Beverage, Pantry, Bakery, Frozen, Other), 'expiry' (estimate YYYY-MM-DD based on today's date), and 'emoji' (a single emoji character representing the item). Return ONLY valid JSON with no additional text.";
+        const systemPrompt = "You are a grocery receipt parser. Extract items into a JSON array. For each item include: 'name', 'price' (number with dot decimals, e.g., 4.99), 'quantity' (integer, default 1), 'category' (Produce, Dairy, Meat, Beverage, Pantry, Bakery, Frozen, Other), 'expiry' (estimate YYYY-MM-DD based on today's date), and 'emoji' (a single emoji character representing the item). Return ONLY valid JSON with no additional text.";
         const userPrompt = `Parse this receipt. Today is ${new Date().toISOString().split('T')[0]}.`;
 
         try {
@@ -785,7 +785,7 @@ export default function App() {
             const itemsToInsert = draftItems.map(item => ({
                 name: item.name,
                 category: item.category,
-                price: item.price,
+                price: parsePrice(item.price),
                 quantity: item.quantity || 1,
                 expiry: item.expiry,
                 emoji: item.emoji,
@@ -901,7 +901,7 @@ export default function App() {
         const form = e.target;
         const name = form.name.value;
         const quantity = parseInt(form.quantity.value);
-        const price = parseFloat(form.price.value);
+        const price = parsePrice(form.price.value);
         const category = form.category.value;
         const expiry = form.expiry?.value; // Only for Fridge
 
