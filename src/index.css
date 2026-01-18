@@ -113,9 +113,9 @@
   width: 0px;
 }
 
-/* Mobile Safari Fixes */
+/* Mobile Safari Fixes - Additive to standard py-4 (1rem) */
 .pb-safe-area-inset-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
 }
 
 /* Glassmorphism */
