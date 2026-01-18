@@ -636,10 +636,11 @@ export default function App() {
         setItems(prev => [...newItems, ...prev]);
         setIsModalOpen(false);
         setModalStep('upload');
+        setActiveTab('fridge'); // Navigate to fridge tab
 
         // Persist to Supabase
         const { data: { user } } = await supabase.auth.getUser();
-        const { data: fridgeUser } = await supabase.from('fridge_users').select('fridge_id').eq('user.id', user.id).single();
+        const { data: fridgeUser } = await supabase.from('fridge_users').select('fridge_id').eq('user_id', user.id).single();
 
         if (fridgeUser) {
             const itemsToInsert = draftItems.map(item => ({
@@ -897,16 +898,30 @@ export default function App() {
     const fetchFridgeMembers = async () => {
         if (!fridgeId) return;
 
-        const { data, error } = await supabase
+        // Get all user_ids for this fridge
+        const { data: fridgeUsers, error: fridgeError } = await supabase
             .from('fridge_users')
-            .select('user_id, users:user_id(email)')
+            .select('user_id')
             .eq('fridge_id', fridgeId);
 
-        if (error) {
-            console.error('Error fetching members:', error);
-        } else {
-            setFridgeMembers(data || []);
+        if (fridgeError) {
+            console.error('Error fetching fridge users:', fridgeError);
+            return;
         }
+
+        // Get user emails from auth.users (need to use RPC or service role)
+        // For now, let's just show user IDs and fetch emails separately
+        const membersWithEmails = await Promise.all(
+            (fridgeUsers || []).map(async (fu) => {
+                const { data: { user } } = await supabase.auth.admin.getUserById(fu.user_id).catch(() => ({ data: { user: null } }));
+                return {
+                    user_id: fu.user_id,
+                    email: user?.email || fu.user_id.substring(0, 8) + '...'
+                };
+            })
+        );
+
+        setFridgeMembers(membersWithEmails);
     };
 
     const leaveFridge = async () => {
@@ -1077,489 +1092,393 @@ export default function App() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-emerald-100">
-            {/* Header */}
-            {/* Header - Hidden on Recipes Tab */}
-            {activeTab !== 'recipes' && (
-                <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4">
-                    <div className="max-w-md mx-auto flex justify-between items-center relative">
-                        <h1 className="text-xl font-black tracking-tighter text-emerald-600">SPOILESS BILLS.</h1>
-                        {/* Settings removed - moved to Bottom Nav */}
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 text-slate-900 font-sans selection:bg-emerald-100">
+            {/* Desktop Sidebar Navigation */}
+            <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-72 lg:flex-col z-40">
+                <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white border-r border-slate-200 px-6 pb-4">
+                    <div className="flex h-16 shrink-0 items-center border-b border-slate-100">
+                        <h1 className="text-2xl font-black tracking-tighter bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                            SPOILESS BILLS
+                        </h1>
                     </div>
-
-                    {/* Toolbar for Fridge/Waste/Consumed Tabs (Hidden for Recipes/Home/Settings) */}
-                    {(activeTab === 'fridge' || activeTab === 'history') && (
-                        <div className="max-w-md mx-auto mt-4 space-y-3">
-                            {/* Search, Sort, and Add Button */}
-                            <div className="flex gap-2">
-                                <div className="flex-1 relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                    <input
-                                        type="text"
-                                        placeholder="Search items..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
-                                    />
-                                </div>
-
-                                {/* Manual Add Button */}
+                    <nav className="flex flex-1 flex-col">
+                        <ul role="list" className="flex flex-1 flex-col gap-y-2">
+                            <li>
                                 <button
-                                    onClick={() => { setManualAddType(activeTab === 'history' ? 'consumed' : 'fridge'); setIsManualAddOpen(true); }}
-                                    className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center active:scale-95 transition-transform shrink-0"
+                                    onClick={() => setActiveTab('home')}
+                                    className={`group flex gap-x-3 rounded-xl p-3 text-sm font-bold leading-6 w-full hover-lift ${activeTab === 'home'
+                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
+                                        : 'text-slate-700 hover:bg-slate-50'
+                                        }`}
                                 >
-                                    <Plus size={20} />
+                                    <Home size={20} />
+                                    Home
                                 </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => setActiveTab('fridge')}
+                                    className={`group flex gap-x-3 rounded-xl p-3 text-sm font-bold leading-6 w-full hover-lift ${activeTab === 'fridge'
+                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
+                                        : 'text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    <Refrigerator size={20} />
+                                    Fridge
+                                    {items.length > 0 && (
+                                        <span className="ml-auto inline-flex items-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">
+                                            {items.length}
+                                        </span>
+                                    )}
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => setActiveTab('history')}
+                                    className={`group flex gap-x-3 rounded-xl p-3 text-sm font-bold leading-6 w-full hover-lift ${activeTab === 'history'
+                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
+                                        : 'text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    <History size={20} />
+                                    History
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => setActiveTab('recipes')}
+                                    className={`group flex gap-x-3 rounded-xl p-3 text-sm font-bold leading-6 w-full hover-lift ${activeTab === 'recipes'
+                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
+                                        : 'text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    <Bot size={20} />
+                                    AI Chef
+                                    {dailyRecipeCount >= 10 && (
+                                        <span className="ml-auto text-xs text-amber-600 font-bold">Limit</span>
+                                    )}
+                                </button>
+                            </li>
+                            <li className="mt-auto">
+                                <button
+                                    onClick={() => setActiveTab('settings')}
+                                    className={`group flex gap-x-3 rounded-xl p-3 text-sm font-bold leading-6 w-full hover-lift ${activeTab === 'settings'
+                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
+                                        : 'text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    <Settings size={20} />
+                                    Settings
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </aside>
 
-                                {activeTab === 'fridge' && (
-                                    <div className="relative">
-                                        <select
-                                            value={sortBy}
-                                            onChange={(e) => setSortBy(e.target.value)}
-                                            className="appearance-none pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
-                                        >
-                                            <option value="expiry">Expiry Date</option>
-                                            <option value="created_at">Date Added</option>
-                                            <option value="price">Price</option>
-                                            <option value="name">Name</option>
-                                        </select>
-                                        <ArrowUpDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+            {/* Main Content Area */}
+            <div className="lg:pl-72">
+                {/* Mobile Header - Hidden on Recipes Tab */}
+                {activeTab !== 'recipes' && (
+                    <header className="lg:hidden sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 fade-in">
+                        <div className="max-w-md mx-auto flex justify-between items-center relative">
+                            <h1 className="text-xl font-black tracking-tighter text-emerald-600">SPOILESS BILLS.</h1>
+                        </div>
+
+                        {/* Toolbar for Fridge/History Tabs */}
+                        {(activeTab === 'fridge' || activeTab === 'history') && (
+                            <div className="max-w-md mx-auto mt-4 space-y-3 scale-in">
+                                {/* Search, Sort, and Add Button */}
+                                <div className="flex gap-2">
+                                    <div className="flex-1 relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search items..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                        />
                                     </div>
-                                )}
-                            </div>
 
-                            {/* History Filters or Category Filters */}
-                            {activeTab === 'history' ? (
-                                <div className="flex bg-slate-100 p-1 rounded-xl">
-                                    {['all', 'consumed', 'waste'].map(filter => (
-                                        <button
-                                            key={filter}
-                                            onClick={() => setHistoryFilter(filter)}
-                                            className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${historyFilter === filter
-                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                : 'text-slate-400 hover:text-slate-600'
-                                                }`}
-                                        >
-                                            {filter}
-                                        </button>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                    {/* Manual Add Button */}
                                     <button
-                                        onClick={() => setFilterCategory('All')}
-                                        className={`px-4 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-colors border ${filterCategory === 'All'
-                                            ? 'bg-slate-800 text-white border-slate-800'
-                                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                                            }`}
+                                        onClick={() => { setManualAddType(activeTab === 'history' ? 'consumed' : 'fridge'); setIsManualAddOpen(true); }}
+                                        className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center active:scale-95 transition-transform shrink-0"
                                     >
-                                        All
+                                        <Plus size={20} />
                                     </button>
-                                    {Object.entries(CATEGORIES).map(([key, { icon }]) => (
+
+                                    {activeTab === 'fridge' && (
+                                        <div className="relative">
+                                            <select
+                                                value={sortBy}
+                                                onChange={(e) => setSortBy(e.target.value)}
+                                                className="appearance-none pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                            >
+                                                <option value="expiry">Expiry Date</option>
+                                                <option value="created_at">Date Added</option>
+                                                <option value="price">Price</option>
+                                                <option value="name">Name</option>
+                                            </select>
+                                            <ArrowUpDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* History Filters or Category Filters */}
+                                {activeTab === 'history' ? (
+                                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                                        {['all', 'consumed', 'waste'].map(filter => (
+                                            <button
+                                                key={filter}
+                                                onClick={() => setHistoryFilter(filter)}
+                                                className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${historyFilter === filter
+                                                    ? 'bg-white text-slate-900 shadow-sm'
+                                                    : 'text-slate-400 hover:text-slate-600'
+                                                    }`}
+                                            >
+                                                {filter}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                                         <button
-                                            key={key}
-                                            onClick={() => setFilterCategory(key)}
-                                            className={`px-4 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-colors border ${filterCategory === key
-                                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                            onClick={() => setFilterCategory('All')}
+                                            className={`px-4 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-colors border ${filterCategory === 'All'
+                                                ? 'bg-slate-800 text-white border-slate-800'
                                                 : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
                                                 }`}
                                         >
-                                            <span className="mr-1">{icon}</span> {key}
+                                            All
                                         </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </header>
-            )}
-            <main className="max-w-md mx-auto p-6 pb-28 space-y-8">
-                {activeTab === 'home' && (
-                    <div className="space-y-6">
-                        {/* Welcome */}
-                        <div className="flex justify-between items-center px-2">
-                            <div>
-                                <h2 className="text-2xl font-black text-slate-800">Hello, Chef! 👨‍🍳</h2>
-                                <p className="text-slate-400 font-bold text-sm">Here's your kitchen status.</p>
-                            </div>
-                        </div>
-
-                        {/* Bento Box Grid */}
-                        <div className="flex flex-col gap-4">
-                            {/* Top: Total Value (Full Width) */}
-                            <div className="w-full p-6 bg-emerald-500 text-white rounded-[2rem] shadow-xl shadow-emerald-200/50 flex flex-col justify-between h-40 relative overflow-hidden">
-                                <div className="absolute right-[-20px] top-[-20px] opacity-10 rotate-12">
-                                    <Refrigerator size={140} />
-                                </div>
-                                <p className="text-xs font-black uppercase opacity-80 tracking-widest">Total Fridge Value</p>
-                                <div>
-                                    <p className="text-5xl font-black tracking-tighter">${totalValue.toFixed(2)}</p>
-                                    <p className="text-emerald-100 font-bold text-xs mt-1">{items.length} items stocked</p>
-                                </div>
-                            </div>
-
-                            {/* Middle: Split Grid */}
-                            <div className="grid grid-cols-2 gap-4">
-                                {/* Wasted */}
-                                <div className="p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex flex-col justify-between h-32">
-                                    <div className="w-10 h-10 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-2">
-                                        <Trash2 size={20} />
+                                        {Object.entries(CATEGORIES).map(([key, { icon }]) => (
+                                            <button
+                                                key={key}
+                                                onClick={() => setFilterCategory(key)}
+                                                className={`px-4 py-1.5 rounded-full text-xs font-black whitespace-nowrap transition-colors border ${filterCategory === key
+                                                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                                                    }`}
+                                            >
+                                                <span className="mr-1">{icon}</span> {key}
+                                            </button>
+                                        ))}
                                     </div>
-                                    <div>
-                                        <p className="text-[10px] font-black uppercase text-slate-400">Wasted Loss</p>
-                                        <p className="text-2xl font-black text-slate-800">${totalWasted.toFixed(2)}</p>
-                                    </div>
-                                </div>
-
-                                {/* Expiring */}
-                                <div className="p-5 bg-amber-50 border border-amber-100 rounded-[2rem] flex flex-col justify-between h-32">
-                                    <div className="w-10 h-10 bg-white text-amber-500 rounded-full flex items-center justify-center mb-2 shadow-sm">
-                                        <Clock size={20} />
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-black uppercase text-amber-500">Expiring Soon</p>
-                                        <p className="text-2xl font-black text-amber-700">{items.filter(i => {
-                                            const days = Math.ceil((new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24));
-                                            return days <= 3 && days >= 0;
-                                        }).length} <span className="text-xs font-bold opacity-60">items</span></p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Recent Activity Feed */}
-                        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <Bell size={14} /> Recent Activity
-                            </h3>
-                            <div className="space-y-4">
-                                {activityLogs.length === 0 ? (
-                                    <p className="text-sm text-slate-400 italic">No recent activity.</p>
-                                ) : (
-                                    activityLogs.map(log => (
-                                        <div key={log.id} className="flex gap-3 items-start animate-in fade-in">
-                                            <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${log.action_type === 'WASTE' ? 'bg-red-400' :
-                                                log.action_type === 'CONSUME' ? 'bg-emerald-400' : 'bg-blue-400'
-                                                }`} />
-                                            <div>
-                                                <p className="text-sm text-slate-700 font-medium">
-                                                    <span className="font-bold text-slate-900">{log.user_email?.split('@')[0]}</span>
-                                                    {' '}{log.action_type === 'ADD' ? 'added' : log.action_type === 'WASTE' ? 'wasted' : log.action_type === 'CONSUME' ? 'consumed' : 'updated'}
-                                                    {' '}<span className="font-bold">{log.item_name}</span>
-                                                </p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                                                    {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {log.details}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))
                                 )}
                             </div>
-                        </div>
-
-                        {/* Quick Actions */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => setIsModalOpen(true)} className="p-4 bg-slate-900 text-white rounded-[2rem] shadow-xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform">
-                                <Camera size={28} />
-                                <span className="text-xs font-black uppercase">Scan Receipt</span>
-                            </button>
-                            <button onClick={() => setActiveTab('fridge')} className="p-4 bg-white border border-slate-200 rounded-[2rem] flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
-                                <Refrigerator size={28} className="text-emerald-500" />
-                                <span className="text-xs font-black uppercase text-slate-600">Check Fridge</span>
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'settings' && (
-                    <div className="space-y-6">
-                        {/* Profile Card */}
-                        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                            <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
-                                <User size={20} className="text-emerald-500" /> PROFILE
-                            </h2>
-                            <p className="text-slate-500 text-sm font-bold mb-4">{session?.user?.email}</p>
-                            <button onClick={handleSignOut} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors">
-                                <LogOut size={14} /> SIGN OUT
-                            </button>
-                        </div>
-
-                        {/* Share Fridge Card */}
-                        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                            <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
-                                <Share2 size={20} className="text-emerald-500" /> SHARE FRIDGE
-                            </h2>
-                            <p className="text-slate-500 text-sm font-bold mb-4">Invite others to manage this fridge.</p>
-
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-700 text-sm">
-                                    {inviteCode || 'Generate Code'}
-                                </div>
-                                <button onClick={copyCode} className="p-3 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 transition-colors">
-                                    <Copy size={16} />
-                                </button>
-                            </div>
-
-                            <button onClick={generateCode} className="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-emerald-600 transition-colors">
-                                <Plus size={14} /> GENERATE NEW CODE
-                            </button>
-                            {inviteCodeExpiry && (
-                                <p className="text-xs text-slate-400 font-bold text-center mt-2">
-                                    Expires: {new Date(inviteCodeExpiry).toLocaleString()}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Fridge Members */}
-                        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                            <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
-                                <Users size={20} className="text-emerald-500" /> FRIDGE MEMBERS
-                            </h2>
-                            <p className="text-slate-500 text-sm font-bold mb-4">
-                                {fridgeMembers.length} {fridgeMembers.length === 1 ? 'person' : 'people'} sharing this fridge
-                            </p>
-
-                            <div className="space-y-2 mb-4">
-                                {fridgeMembers.map((member, index) => (
-                                    <div key={member.user_id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                                        <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-black text-sm">
-                                            {member.users?.email?.charAt(0).toUpperCase() || '?'}
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="text-sm font-bold text-slate-700">{member.users?.email || 'Unknown'}</p>
-                                            {member.user_id === session?.user?.id && (
-                                                <p className="text-xs text-emerald-600 font-bold">You</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Actions */}
-                            <div className="space-y-3 pt-4 border-t border-slate-100">
-                                <button
-                                    onClick={leaveFridge}
-                                    className="w-full py-3 bg-amber-50 text-amber-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors border border-amber-200"
-                                >
-                                    <LogOut size={14} /> LEAVE FRIDGE
-                                </button>
-                                <button
-                                    onClick={deleteFridge}
-                                    className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-red-100 transition-colors border border-red-200"
-                                >
-                                    <Trash2 size={14} /> DELETE FRIDGE PERMANENTLY
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'waste' && (
-                    <div className="space-y-6">
-                        {/* Summary Card (Mini) */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-red-50 p-4 rounded-2xl border border-red-100">
-                                <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Total Wasted</p>
-                                <p className="text-2xl font-black text-red-600">${filteredWasteItems.reduce((acc, i) => acc + (i.price * i.quantity), 0).toFixed(2)}</p>
-                            </div>
-                            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Items Count</p>
-                                <p className="text-2xl font-black text-slate-900">{filteredWasteItems.length}</p>
-                            </div>
-                        </div>
-
-                        {filteredWasteItems.length === 0 ? (
-                            <div className="text-center py-20 opacity-40">
-                                <Trash2 className="w-12 h-12 mx-auto mb-4 stroke-1" />
-                                <p className="font-bold">No waste found</p>
-                                <p className="text-sm">Try adjusting your filters</p>
-                            </div>
-                        ) : (
-                            Object.entries(groupItemsByDate(filteredWasteItems, 'wasted_at')).map(([dateLabel, groupItems]) => (
-                                groupItems.length > 0 && (
-                                    <div key={dateLabel} className="animate-in fade-in slide-in-from-bottom-2">
-                                        <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 pl-2">{dateLabel}</h3>
-                                        <div className="space-y-3">
-                                            {groupItems.map(item => (
-                                                <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 relative">
-                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${CATEGORIES[item.category]?.color || CATEGORIES.Other.color}`}>
-                                                        {item.emoji || CATEGORIES[item.category]?.icon || '📦'}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex justify-between items-start">
-                                                            <p className="font-bold text-slate-800 text-sm truncate">
-                                                                {item.quantity > 1 && <span className="text-red-500 mr-1">x{item.quantity}</span>}
-                                                                {item.name}
-                                                            </p>
-                                                            <span className="font-bold text-slate-400 text-[10px]">${(item.price * (item.quantity || 1))?.toFixed(2)}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                Wasted: {new Date(item.wastedAt || item.wasted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Kebab Menu */}
-                                                    <div className="relative">
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.id ? null : item.id); }}
-                                                            className="p-2 text-slate-300 hover:text-slate-600 rounded-lg"
-                                                        >
-                                                            <MoreVertical size={16} />
-                                                        </button>
-                                                        {openMenuId === item.id && (
-                                                            <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-20 min-w-[140px] flex flex-col gap-1 animate-in fade-in zoom-in-95 origin-top-right">
-                                                                <button onClick={() => { setEditingItem(item); setEditType('waste'); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-600">
-                                                                    <Pencil size={14} /> Edit Details
-                                                                </button>
-                                                                {/* Future: Restore to Fridge */}
-                                                            </div>
-                                                        )}
-                                                        {activeTab === 'waste' && openMenuId === item.id && (
-                                                            <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )
-                            ))
                         )}
-                    </div>
+                    </header>
                 )}
-
-                {activeTab === 'recipes' && (
-                    <div className="flex flex-col h-[calc(100vh-180px)]">
-                        {/* Chat Header */}
-                        <div className="bg-white p-4 rounded-b-[2rem] shadow-sm border-b border-slate-100 flex items-center justify-between z-10">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center p-1">
-                                    <ChefHat size={20} className="text-emerald-600" />
-                                </div>
+                <main className="max-w-md mx-auto p-6 pb-28 space-y-8">
+                    {activeTab === 'home' && (
+                        <div className="space-y-6">
+                            {/* Welcome */}
+                            <div className="flex justify-between items-center px-2">
                                 <div>
-                                    <h2 className="text-sm font-black text-slate-800">AI Chef</h2>
-                                    <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
-                                        <span className={`w-1.5 h-1.5 rounded-full ${dailyRecipeCount >= 2 ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-                                        {dailyRecipeCount >= 2 ? 'Off Duty (Limit Reached)' : 'Online'}
-                                    </p>
+                                    <h2 className="text-2xl font-black text-slate-800">Hello, Chef! 👨‍🍳</h2>
+                                    <p className="text-slate-400 font-bold text-sm">Here's your kitchen status.</p>
                                 </div>
                             </div>
-                            <div className="bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                                <p className="text-[10px] font-black text-slate-500">{dailyRecipeCount}/2 Recipes</p>
-                            </div>
-                        </div>
 
-                        {/* Chat Feed */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
-                            {chatMessages.map((msg) => (
-                                <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-in slide-in-from-bottom-2`}>
-                                    {/* Avatar */}
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border ${msg.role === 'assistant' ? 'bg-emerald-100 border-emerald-200' : 'bg-slate-100 border-slate-200'}`}>
-                                        {msg.role === 'assistant' ? <Bot size={16} className="text-emerald-600" /> : <UserCircle2 size={16} className="text-slate-500" />}
+                            {/* Bento Box Grid */}
+                            <div className="flex flex-col gap-4">
+                                {/* Top: Total Value (Full Width) */}
+                                <div className="w-full p-6 bg-emerald-500 text-white rounded-[2rem] shadow-xl shadow-emerald-200/50 flex flex-col justify-between h-40 relative overflow-hidden">
+                                    <div className="absolute right-[-20px] top-[-20px] opacity-10 rotate-12">
+                                        <Refrigerator size={140} />
+                                    </div>
+                                    <p className="text-xs font-black uppercase opacity-80 tracking-widest">Total Fridge Value</p>
+                                    <div>
+                                        <p className="text-5xl font-black tracking-tighter">${totalValue.toFixed(2)}</p>
+                                        <p className="text-emerald-100 font-bold text-xs mt-1">{items.length} items stocked</p>
+                                    </div>
+                                </div>
+
+                                {/* Middle: Split Grid */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    {/* Wasted */}
+                                    <div className="p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex flex-col justify-between h-32">
+                                        <div className="w-10 h-10 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-2">
+                                            <Trash2 size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase text-slate-400">Wasted Loss</p>
+                                            <p className="text-2xl font-black text-slate-800">${totalWasted.toFixed(2)}</p>
+                                        </div>
                                     </div>
 
-                                    {/* Bubble */}
-                                    <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm ${msg.role === 'assistant'
-                                        ? 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'
-                                        : 'bg-emerald-500 text-white rounded-tr-none'}`}>
-                                        {msg.isRecipe ? (
-                                            <div className="prose prose-emerald prose-sm dark:prose-invert max-w-none">
-                                                <SimpleMarkdownRenderer content={msg.text} />
+                                    {/* Expiring */}
+                                    <div className="p-5 bg-amber-50 border border-amber-100 rounded-[2rem] flex flex-col justify-between h-32">
+                                        <div className="w-10 h-10 bg-white text-amber-500 rounded-full flex items-center justify-center mb-2 shadow-sm">
+                                            <Clock size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase text-amber-500">Expiring Soon</p>
+                                            <p className="text-2xl font-black text-amber-700">{items.filter(i => {
+                                                const days = Math.ceil((new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24));
+                                                return days <= 3 && days >= 0;
+                                            }).length} <span className="text-xs font-bold opacity-60">items</span></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Recent Activity Feed */}
+                            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <Bell size={14} /> Recent Activity
+                                </h3>
+                                <div className="space-y-4">
+                                    {activityLogs.length === 0 ? (
+                                        <p className="text-sm text-slate-400 italic">No recent activity.</p>
+                                    ) : (
+                                        activityLogs.map(log => (
+                                            <div key={log.id} className="flex gap-3 items-start animate-in fade-in">
+                                                <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${log.action_type === 'WASTE' ? 'bg-red-400' :
+                                                    log.action_type === 'CONSUME' ? 'bg-emerald-400' : 'bg-blue-400'
+                                                    }`} />
+                                                <div>
+                                                    <p className="text-sm text-slate-700 font-medium">
+                                                        <span className="font-bold text-slate-900">{log.user_email?.split('@')[0]}</span>
+                                                        {' '}{log.action_type === 'ADD' ? 'added' : log.action_type === 'WASTE' ? 'wasted' : log.action_type === 'CONSUME' ? 'consumed' : 'updated'}
+                                                        {' '}<span className="font-bold">{log.item_name}</span>
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                                                        {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {log.details}
+                                                    </p>
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <p className="text-sm font-medium whitespace-pre-wrap">{msg.text}</p>
-                                        )}
-                                    </div>
+                                        ))
+                                    )}
                                 </div>
-                            ))}
+                            </div>
 
-                            {/* Typing Indicator */}
-                            {isTyping && (
-                                <div className="flex gap-3 animate-in fade-in">
-                                    <div className="w-8 h-8 bg-emerald-100 border border-emerald-200 rounded-full flex items-center justify-center">
-                                        <Bot size={16} className="text-emerald-600" />
-                                    </div>
-                                    <div className="bg-white border border-slate-100 p-4 rounded-2xl rounded-tl-none flex items-center gap-1 shadow-sm h-12">
-                                        <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                        <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                        <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                                    </div>
-                                </div>
-                            )}
-                            <div ref={messagesEndRef} />
-                        </div>
-
-                        {/* Input Area (Fixed) */}
-                        <div className="absolute bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent">
-                            {/* Quick Replies (Only if not typing and limit not reached) */}
-                            {!isTyping && dailyRecipeCount < 2 && (
-                                <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide px-2">
-                                    <button onClick={() => generateRecipe('expiring')} className="whitespace-nowrap px-4 py-2 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors shadow-sm active:scale-95">
-                                        Use Expiring ⏳
-                                    </button>
-                                    <button onClick={() => generateRecipe('surprise')} className="whitespace-nowrap px-4 py-2 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 transition-colors shadow-sm active:scale-95">
-                                        Surprise Me 🎲
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Text Input */}
-                            <form onSubmit={handleChatSubmit} className="flex gap-2 items-center bg-white p-2 rounded-[2rem] shadow-lg border border-slate-100">
-                                <input
-                                    type="text"
-                                    value={chatInput}
-                                    onChange={(e) => setChatInput(e.target.value)}
-                                    placeholder={dailyRecipeCount >= 2 ? "Daily limit reached..." : "Ask for a specific recipe..."}
-                                    disabled={dailyRecipeCount >= 2 || isTyping}
-                                    className="flex-1 pl-4 py-2 bg-transparent text-sm font-bold text-slate-700 placeholder:text-slate-300 outline-none"
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={!chatInput.trim() || dailyRecipeCount >= 2 || isTyping}
-                                    className="p-2.5 bg-emerald-500 text-white rounded-full disabled:bg-slate-200 disabled:text-slate-400 transition-all hover:bg-emerald-600 active:scale-95"
-                                >
-                                    <Send size={18} />
+                            {/* Quick Actions */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <button onClick={() => setIsModalOpen(true)} className="p-4 bg-slate-900 text-white rounded-[2rem] shadow-xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform">
+                                    <Camera size={28} />
+                                    <span className="text-xs font-black uppercase">Scan Receipt</span>
                                 </button>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'fridge' && (
-                    <div className="space-y-6">
-                        {/* Quick Stats Summary - Fridge */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">In Fridge</p>
-                                <p className="text-2xl font-black text-slate-900">${filteredItems.reduce((acc, curr) => acc + ((curr.price || 0) * (curr.quantity || 1)), 0).toFixed(2)}</p>
-                            </div>
-                            <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-                                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Expiring Soon</p>
-                                <p className="text-2xl font-black text-amber-600">{filteredItems.filter(i => {
-                                    const days = Math.ceil((new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24));
-                                    return days <= 3 && days >= 0;
-                                }).length} <span className="text-xs font-bold opacity-60">items</span></p>
+                                <button onClick={() => setActiveTab('fridge')} className="p-4 bg-white border border-slate-200 rounded-[2rem] flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
+                                    <Refrigerator size={28} className="text-emerald-500" />
+                                    <span className="text-xs font-black uppercase text-slate-600">Check Fridge</span>
+                                </button>
                             </div>
                         </div>
+                    )}
 
-                        {filteredItems.length === 0 ? (
-                            <div className="text-center py-20 opacity-40">
-                                <Refrigerator className="w-12 h-12 mx-auto mb-4 stroke-1" />
-                                <p className="font-bold">No items found</p>
-                                <p className="text-sm">Try adjusting your filters</p>
+                    {activeTab === 'settings' && (
+                        <div className="space-y-6">
+                            {/* Profile Card */}
+                            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                                <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+                                    <User size={20} className="text-emerald-500" /> PROFILE
+                                </h2>
+                                <p className="text-slate-500 text-sm font-bold mb-4">{session?.user?.email}</p>
+                                <button onClick={handleSignOut} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors">
+                                    <LogOut size={14} /> SIGN OUT
+                                </button>
                             </div>
-                        ) : (
-                            Object.entries(groupItemsByDate(filteredItems)).map(([dateLabel, groupItems]) => (
-                                groupItems.length > 0 && (
-                                    <div key={dateLabel} className="animate-in fade-in slide-in-from-bottom-2">
-                                        <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 pl-2">{dateLabel}</h3>
-                                        <div className="space-y-3">
-                                            {groupItems.map(item => {
-                                                const isExpired = new Date(item.expiry) < new Date();
-                                                const daysLeft = Math.ceil((new Date(item.expiry) - new Date()) / (1000 * 60 * 60 * 24));
-                                                return (
+
+                            {/* Share Fridge Card */}
+                            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                                <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+                                    <Share2 size={20} className="text-emerald-500" /> SHARE FRIDGE
+                                </h2>
+                                <p className="text-slate-500 text-sm font-bold mb-4">Invite others to manage this fridge.</p>
+
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-700 text-sm">
+                                        {inviteCode || 'Generate Code'}
+                                    </div>
+                                    <button onClick={copyCode} className="p-3 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 transition-colors">
+                                        <Copy size={16} />
+                                    </button>
+                                </div>
+
+                                <button onClick={generateCode} className="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-emerald-600 transition-colors">
+                                    <Plus size={14} /> GENERATE NEW CODE
+                                </button>
+                                {inviteCodeExpiry && (
+                                    <p className="text-xs text-slate-400 font-bold text-center mt-2">
+                                        Expires: {new Date(inviteCodeExpiry).toLocaleString()}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Fridge Members */}
+                            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                                <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+                                    <Users size={20} className="text-emerald-500" /> FRIDGE MEMBERS
+                                </h2>
+                                <p className="text-slate-500 text-sm font-bold mb-4">
+                                    {fridgeMembers.length} {fridgeMembers.length === 1 ? 'person' : 'people'} sharing this fridge
+                                </p>
+
+                                <div className="space-y-2 mb-4">
+                                    {fridgeMembers.map((member, index) => (
+                                        <div key={member.user_id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                                            <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-black text-sm">
+                                                {member.email?.charAt(0).toUpperCase() || '?'}
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-sm font-bold text-slate-700">{member.email || 'Unknown'}</p>
+                                                {member.user_id === session?.user?.id && (
+                                                    <p className="text-xs text-emerald-600 font-bold">You</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="space-y-3 pt-4 border-t border-slate-100">
+                                    <button
+                                        onClick={leaveFridge}
+                                        className="w-full py-3 bg-amber-50 text-amber-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors border border-amber-200"
+                                    >
+                                        <LogOut size={14} /> LEAVE FRIDGE
+                                    </button>
+                                    <button
+                                        onClick={deleteFridge}
+                                        className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-red-100 transition-colors border border-red-200"
+                                    >
+                                        <Trash2 size={14} /> DELETE FRIDGE PERMANENTLY
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'waste' && (
+                        <div className="space-y-6">
+                            {/* Summary Card (Mini) */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-red-50 p-4 rounded-2xl border border-red-100">
+                                    <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Total Wasted</p>
+                                    <p className="text-2xl font-black text-red-600">${filteredWasteItems.reduce((acc, i) => acc + (i.price * i.quantity), 0).toFixed(2)}</p>
+                                </div>
+                                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Items Count</p>
+                                    <p className="text-2xl font-black text-slate-900">{filteredWasteItems.length}</p>
+                                </div>
+                            </div>
+
+                            {filteredWasteItems.length === 0 ? (
+                                <div className="text-center py-20 opacity-40">
+                                    <Trash2 className="w-12 h-12 mx-auto mb-4 stroke-1" />
+                                    <p className="font-bold">No waste found</p>
+                                    <p className="text-sm">Try adjusting your filters</p>
+                                </div>
+                            ) : (
+                                Object.entries(groupItemsByDate(filteredWasteItems, 'wasted_at')).map(([dateLabel, groupItems]) => (
+                                    groupItems.length > 0 && (
+                                        <div key={dateLabel} className="animate-in fade-in slide-in-from-bottom-2">
+                                            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 pl-2">{dateLabel}</h3>
+                                            <div className="space-y-3">
+                                                {groupItems.map(item => (
                                                     <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 relative">
                                                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${CATEGORIES[item.category]?.color || CATEGORIES.Other.color}`}>
                                                             {item.emoji || CATEGORIES[item.category]?.icon || '📦'}
@@ -1567,14 +1486,14 @@ export default function App() {
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex justify-between items-start">
                                                                 <p className="font-bold text-slate-800 text-sm truncate">
-                                                                    {item.quantity > 1 && <span className="text-emerald-600 mr-1">x{item.quantity}</span>}
+                                                                    {item.quantity > 1 && <span className="text-red-500 mr-1">x{item.quantity}</span>}
                                                                     {item.name}
                                                                 </p>
                                                                 <span className="font-bold text-slate-400 text-[10px]">${(item.price * (item.quantity || 1))?.toFixed(2)}</span>
                                                             </div>
                                                             <div className="flex items-center gap-2 mt-1">
-                                                                <p className={`text-[10px] font-bold ${isExpired ? 'text-red-500' : daysLeft <= 3 ? 'text-amber-500' : 'text-slate-400'}`}>
-                                                                    {isExpired ? 'Expired' : `${daysLeft} days left`}
+                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                    Wasted: {new Date(item.wastedAt || item.wasted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -1589,480 +1508,660 @@ export default function App() {
                                                             </button>
                                                             {openMenuId === item.id && (
                                                                 <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-20 min-w-[140px] flex flex-col gap-1 animate-in fade-in zoom-in-95 origin-top-right">
-                                                                    <button onClick={() => { setEditingItem(item); setEditType('fridge'); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-600">
-                                                                        <Pencil size={14} /> Edit
+                                                                    <button onClick={() => { setEditingItem(item); setEditType('waste'); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-600">
+                                                                        <Pencil size={14} /> Edit Details
                                                                     </button>
-                                                                    <button onClick={() => { markConsumed(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-emerald-50 rounded-lg text-xs font-bold text-emerald-600">
-                                                                        <CheckCircle2 size={14} /> Consumed
-                                                                    </button>
-                                                                    <button onClick={() => { markWasted(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-red-50 rounded-lg text-xs font-bold text-red-500">
-                                                                        <Trash2 size={14} /> Wasted
-                                                                    </button>
+                                                                    {/* Future: Restore to Fridge */}
                                                                 </div>
                                                             )}
-                                                            {/* Backdrop to close menu */}
-                                                            {openMenuId === item.id && (
+                                                            {activeTab === 'waste' && openMenuId === item.id && (
                                                                 <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
                                                             )}
                                                         </div>
                                                     </div>
-                                                );
-                                            })}
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                ))
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'recipes' && (
+                        <div className="flex flex-col h-[calc(100vh-180px)]">
+                            {/* Chat Header */}
+                            <div className="bg-white p-4 rounded-b-[2rem] shadow-sm border-b border-slate-100 flex items-center justify-between z-10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center p-1">
+                                        <ChefHat size={20} className="text-emerald-600" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-sm font-black text-slate-800">AI Chef</h2>
+                                        <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
+                                            <span className={`w-1.5 h-1.5 rounded-full ${dailyRecipeCount >= 2 ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
+                                            {dailyRecipeCount >= 2 ? 'Off Duty (Limit Reached)' : 'Online'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                                    <p className="text-[10px] font-black text-slate-500">{dailyRecipeCount}/2 Recipes</p>
+                                </div>
+                            </div>
+
+                            {/* Chat Feed */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
+                                {chatMessages.map((msg) => (
+                                    <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-in slide-in-from-bottom-2`}>
+                                        {/* Avatar */}
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border ${msg.role === 'assistant' ? 'bg-emerald-100 border-emerald-200' : 'bg-slate-100 border-slate-200'}`}>
+                                            {msg.role === 'assistant' ? <Bot size={16} className="text-emerald-600" /> : <UserCircle2 size={16} className="text-slate-500" />}
+                                        </div>
+
+                                        {/* Bubble */}
+                                        <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm ${msg.role === 'assistant'
+                                            ? 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'
+                                            : 'bg-emerald-500 text-white rounded-tr-none'}`}>
+                                            {msg.isRecipe ? (
+                                                <div className="prose prose-emerald prose-sm dark:prose-invert max-w-none">
+                                                    <SimpleMarkdownRenderer content={msg.text} />
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm font-medium whitespace-pre-wrap">{msg.text}</p>
+                                            )}
                                         </div>
                                     </div>
-                                )
-                            ))
-                        )}
-                    </div>
-                )}
+                                ))}
 
-                {activeTab === 'consumed' && (
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Total Value</p>
-                                <p className="text-2xl font-black text-emerald-600">${filteredConsumedItems.reduce((acc, i) => acc + (i.price * i.quantity), 0).toFixed(2)}</p>
+                                {/* Typing Indicator */}
+                                {isTyping && (
+                                    <div className="flex gap-3 animate-in fade-in">
+                                        <div className="w-8 h-8 bg-emerald-100 border border-emerald-200 rounded-full flex items-center justify-center">
+                                            <Bot size={16} className="text-emerald-600" />
+                                        </div>
+                                        <div className="bg-white border border-slate-100 p-4 rounded-2xl rounded-tl-none flex items-center gap-1 shadow-sm h-12">
+                                            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                        </div>
+                                    </div>
+                                )}
+                                <div ref={messagesEndRef} />
                             </div>
-                            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Items Count</p>
-                                <p className="text-2xl font-black text-slate-900">{filteredConsumedItems.length}</p>
+
+                            {/* Input Area (Fixed) */}
+                            <div className="absolute bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent">
+                                {/* Quick Replies (Only if not typing and limit not reached) */}
+                                {!isTyping && dailyRecipeCount < 2 && (
+                                    <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide px-2">
+                                        <button onClick={() => generateRecipe('expiring')} className="whitespace-nowrap px-4 py-2 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors shadow-sm active:scale-95">
+                                            Use Expiring ⏳
+                                        </button>
+                                        <button onClick={() => generateRecipe('surprise')} className="whitespace-nowrap px-4 py-2 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200 transition-colors shadow-sm active:scale-95">
+                                            Surprise Me 🎲
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Text Input */}
+                                <form onSubmit={handleChatSubmit} className="flex gap-2 items-center bg-white p-2 rounded-[2rem] shadow-lg border border-slate-100">
+                                    <input
+                                        type="text"
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        placeholder={dailyRecipeCount >= 2 ? "Daily limit reached..." : "Ask for a specific recipe..."}
+                                        disabled={dailyRecipeCount >= 2 || isTyping}
+                                        className="flex-1 pl-4 py-2 bg-transparent text-sm font-bold text-slate-700 placeholder:text-slate-300 outline-none"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!chatInput.trim() || dailyRecipeCount >= 2 || isTyping}
+                                        className="p-2.5 bg-emerald-500 text-white rounded-full disabled:bg-slate-200 disabled:text-slate-400 transition-all hover:bg-emerald-600 active:scale-95"
+                                    >
+                                        <Send size={18} />
+                                    </button>
+                                </form>
                             </div>
                         </div>
+                    )}
 
-                        {filteredConsumedItems.length === 0 ? (
-                            <div className="text-center py-20 opacity-40">
-                                <UtensilsCrossed className="w-12 h-12 mx-auto mb-4 stroke-1" />
-                                <p className="font-bold">No consumed items found</p>
-                                <p className="text-sm">Try adjusting your filters</p>
+                    {activeTab === 'fridge' && (
+                        <div className="space-y-6">
+                            {/* Quick Stats Summary - Fridge */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">In Fridge</p>
+                                    <p className="text-2xl font-black text-slate-900">${filteredItems.reduce((acc, curr) => acc + ((curr.price || 0) * (curr.quantity || 1)), 0).toFixed(2)}</p>
+                                </div>
+                                <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
+                                    <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Expiring Soon</p>
+                                    <p className="text-2xl font-black text-amber-600">{filteredItems.filter(i => {
+                                        const days = Math.ceil((new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24));
+                                        return days <= 3 && days >= 0;
+                                    }).length} <span className="text-xs font-bold opacity-60">items</span></p>
+                                </div>
                             </div>
-                        ) : (
-                            Object.entries(groupItemsByDate(filteredConsumedItems, 'consumed_at')).map(([dateLabel, groupItems]) => (
-                                groupItems.length > 0 && (
-                                    <div key={dateLabel} className="animate-in fade-in slide-in-from-bottom-2">
-                                        <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 pl-2">{dateLabel}</h3>
-                                        <div className="space-y-3">
-                                            {groupItems.map((item, i) => (
-                                                <div key={i} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 relative">
-                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${CATEGORIES[item.category]?.color || CATEGORIES.Other.color}`}>
-                                                        {item.emoji || CATEGORIES[item.category]?.icon || '📦'}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex justify-between items-start">
-                                                            <p className="font-bold text-slate-800 text-sm truncate">
-                                                                {item.quantity > 1 && <span className="text-emerald-600 mr-1">x{item.quantity}</span>}
-                                                                {item.name}
-                                                            </p>
-                                                            <span className="font-bold text-slate-400 text-[10px]">${(item.price * (item.quantity || 1))?.toFixed(2)}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                Consumed: {(() => {
-                                                                    const date = new Date(item.consumed_at || item.created_at);
-                                                                    return isNaN(date.getTime()) ? 'Unknown' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                                                })()}
-                                                            </p>
-                                                        </div>
-                                                    </div>
 
-                                                    {/* Kebab Menu */}
-                                                    <div className="relative">
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.id ? null : item.id); }}
-                                                            className="p-2 text-slate-300 hover:text-slate-600 rounded-lg"
-                                                        >
-                                                            <MoreVertical size={16} />
-                                                        </button>
-                                                        {openMenuId === item.id && (
-                                                            <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-20 min-w-[140px] flex flex-col gap-1 animate-in fade-in zoom-in-95 origin-top-right">
-                                                                {/* Future: Undo Consume (Move back to Fridge) */}
-                                                                <div className="p-3 text-[10px] text-slate-400 font-bold text-center">No actions available</div>
+                            {filteredItems.length === 0 ? (
+                                <div className="text-center py-20 opacity-40">
+                                    <Refrigerator className="w-12 h-12 mx-auto mb-4 stroke-1" />
+                                    <p className="font-bold">No items found</p>
+                                    <p className="text-sm">Try adjusting your filters</p>
+                                </div>
+                            ) : (
+                                Object.entries(groupItemsByDate(filteredItems)).map(([dateLabel, groupItems]) => (
+                                    groupItems.length > 0 && (
+                                        <div key={dateLabel} className="animate-in fade-in slide-in-from-bottom-2">
+                                            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 pl-2">{dateLabel}</h3>
+                                            <div className="space-y-3">
+                                                {groupItems.map(item => {
+                                                    const isExpired = new Date(item.expiry) < new Date();
+                                                    const daysLeft = Math.ceil((new Date(item.expiry) - new Date()) / (1000 * 60 * 60 * 24));
+                                                    return (
+                                                        <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 relative">
+                                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${CATEGORIES[item.category]?.color || CATEGORIES.Other.color}`}>
+                                                                {item.emoji || CATEGORIES[item.category]?.icon || '📦'}
                                                             </div>
-                                                        )}
-                                                        {activeTab === 'consumed' && openMenuId === item.id && (
-                                                            <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                                                        )}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start">
+                                                                    <p className="font-bold text-slate-800 text-sm truncate">
+                                                                        {item.quantity > 1 && <span className="text-emerald-600 mr-1">x{item.quantity}</span>}
+                                                                        {item.name}
+                                                                    </p>
+                                                                    <span className="font-bold text-slate-400 text-[10px]">${(item.price * (item.quantity || 1))?.toFixed(2)}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <p className={`text-[10px] font-bold ${isExpired ? 'text-red-500' : daysLeft <= 3 ? 'text-amber-500' : 'text-slate-400'}`}>
+                                                                        {isExpired ? 'Expired' : `${daysLeft} days left`}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Kebab Menu */}
+                                                            <div className="relative">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.id ? null : item.id); }}
+                                                                    className="p-2 text-slate-300 hover:text-slate-600 rounded-lg"
+                                                                >
+                                                                    <MoreVertical size={16} />
+                                                                </button>
+                                                                {openMenuId === item.id && (
+                                                                    <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-20 min-w-[140px] flex flex-col gap-1 animate-in fade-in zoom-in-95 origin-top-right">
+                                                                        <button onClick={() => { setEditingItem(item); setEditType('fridge'); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-600">
+                                                                            <Pencil size={14} /> Edit
+                                                                        </button>
+                                                                        <button onClick={() => { markConsumed(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-emerald-50 rounded-lg text-xs font-bold text-emerald-600">
+                                                                            <CheckCircle2 size={14} /> Consumed
+                                                                        </button>
+                                                                        <button onClick={() => { markWasted(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-red-50 rounded-lg text-xs font-bold text-red-500">
+                                                                            <Trash2 size={14} /> Wasted
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                                {/* Backdrop to close menu */}
+                                                                {openMenuId === item.id && (
+                                                                    <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )
+                                ))
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'consumed' && (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Total Value</p>
+                                    <p className="text-2xl font-black text-emerald-600">${filteredConsumedItems.reduce((acc, i) => acc + (i.price * i.quantity), 0).toFixed(2)}</p>
+                                </div>
+                                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Items Count</p>
+                                    <p className="text-2xl font-black text-slate-900">{filteredConsumedItems.length}</p>
+                                </div>
+                            </div>
+
+                            {filteredConsumedItems.length === 0 ? (
+                                <div className="text-center py-20 opacity-40">
+                                    <UtensilsCrossed className="w-12 h-12 mx-auto mb-4 stroke-1" />
+                                    <p className="font-bold">No consumed items found</p>
+                                    <p className="text-sm">Try adjusting your filters</p>
+                                </div>
+                            ) : (
+                                Object.entries(groupItemsByDate(filteredConsumedItems, 'consumed_at')).map(([dateLabel, groupItems]) => (
+                                    groupItems.length > 0 && (
+                                        <div key={dateLabel} className="animate-in fade-in slide-in-from-bottom-2">
+                                            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 pl-2">{dateLabel}</h3>
+                                            <div className="space-y-3">
+                                                {groupItems.map((item, i) => (
+                                                    <div key={i} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 relative">
+                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${CATEGORIES[item.category]?.color || CATEGORIES.Other.color}`}>
+                                                            {item.emoji || CATEGORIES[item.category]?.icon || '📦'}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex justify-between items-start">
+                                                                <p className="font-bold text-slate-800 text-sm truncate">
+                                                                    {item.quantity > 1 && <span className="text-emerald-600 mr-1">x{item.quantity}</span>}
+                                                                    {item.name}
+                                                                </p>
+                                                                <span className="font-bold text-slate-400 text-[10px]">${(item.price * (item.quantity || 1))?.toFixed(2)}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                    Consumed: {(() => {
+                                                                        const date = new Date(item.consumed_at || item.created_at);
+                                                                        return isNaN(date.getTime()) ? 'Unknown' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                                                    })()}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Kebab Menu */}
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.id ? null : item.id); }}
+                                                                className="p-2 text-slate-300 hover:text-slate-600 rounded-lg"
+                                                            >
+                                                                <MoreVertical size={16} />
+                                                            </button>
+                                                            {openMenuId === item.id && (
+                                                                <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-20 min-w-[140px] flex flex-col gap-1 animate-in fade-in zoom-in-95 origin-top-right">
+                                                                    {/* Future: Undo Consume (Move back to Fridge) */}
+                                                                    <div className="p-3 text-[10px] text-slate-400 font-bold text-center">No actions available</div>
+                                                                </div>
+                                                            )}
+                                                            {activeTab === 'consumed' && openMenuId === item.id && (
+                                                                <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                ))
+                            )}
+                        </div>
+                    )}
+                    {/* Unified History Tab */}
+                    {activeTab === 'history' && (
+                        <div className="space-y-4">
+                            {Object.entries(historyGroups).map(([date, items]) => (
+                                <div key={date}>
+                                    <h3 className="sticky top-[140px] z-10 py-2 bg-slate-50/95 backdrop-blur text-xs font-black text-slate-400 uppercase tracking-widest pl-2 mb-2">
+                                        {new Date(date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {items.map(item => (
+                                            <div key={item.id} className={`bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between group ${item.type === 'waste' ? 'border-l-4 border-l-red-400' : 'border-l-4 border-l-emerald-400'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-2xl">{CATEGORIES[item.category]?.icon || '📦'}</span>
+                                                    <div>
+                                                        <p className="font-black text-slate-800">{item.name}</p>
+                                                        <p className="text-xs text-slate-500 font-bold flex items-center gap-1">
+                                                            <span>{item.quantity}x</span>
+                                                            <span className="text-slate-300">•</span>
+                                                            <span>${item.price}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button className="p-2 text-slate-300">
+                                                    {/* No actions for history for now, just view */}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                            {Object.keys(historyGroups).length === 0 && (
+                                <div className="text-center py-20 opacity-50">
+                                    <History size={48} className="mx-auto mb-4 text-slate-300" />
+                                    <p className="font-bold text-slate-400">No history found.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </main>
+
+                {/* FAB (Lifted for Bottom Nav) - Hidden on Recipes Tab */}
+                {
+                    activeTab !== 'recipes' && (
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="fixed bottom-24 right-6 w-14 h-14 bg-slate-900 text-white rounded-full shadow-xl shadow-slate-300 flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-20"
+                        >
+                            <Camera size={24} />
+                        </button>
+                    )
+                }
+
+
+                {/* Modal */}
+                {
+                    isModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6">
+                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
+                            <div className="relative bg-white w-full max-w-md rounded-[2.5rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10 duration-300 max-h-[90vh] overflow-y-auto">
+
+                                {/* Modal Header */}
+                                <div className="flex justify-between items-center mb-8">
+                                    <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                        {modalStep === 'upload' && <><Camera className="text-emerald-500" /> SCAN RECEIPT</>}
+                                        {modalStep === 'loading' && <><Loader2 className="animate-spin text-emerald-500" /> PROCESSING</>}
+                                        {modalStep === 'verify' && <><CheckCircle2 className="text-emerald-500" /> VERIFY ITEMS</>}
+                                    </h2>
+                                    <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
+                                        <X size={20} className="text-slate-500" />
+                                    </button>
+                                </div>
+
+                                {/* Modal Content */}
+                                <div className="min-h-[200px]">
+                                    {modalStep === 'upload' && (
+                                        <div className="text-center py-10">
+                                            <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                                                <Camera className="text-emerald-500 w-10 h-10" />
+                                            </div>
+                                            <p className="text-slate-500 text-sm mb-8 px-4">
+                                                {isNative ? 'Take a photo of your receipt.' : 'Upload a clear photo of your receipt.'} OpenAI will automatically extract names, prices, and expiry dates.
+                                            </p>
+                                            {isNative ? (
+                                                <button
+                                                    onClick={capturePhoto}
+                                                    className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg">
+                                                    TAKE PHOTO
+                                                </button>
+                                            ) : (
+                                                <label className="block w-full py-4 bg-emerald-600 text-white rounded-2xl font-black cursor-pointer text-center">
+                                                    CHOOSE PHOTO
+                                                    <input type="file" className="hidden" accept="image/*" onChange={processReceipt} />
+                                                </label>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {modalStep === 'loading' && (
+                                        <div className="text-center py-10">
+                                            <div className="relative w-20 h-20 mx-auto mb-6">
+                                                <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                                                <div className="absolute inset-0 border-4 border-emerald-500 rounded-full border-t-transparent animate-spin"></div>
+                                            </div>
+                                            <p className="font-black text-slate-800 mb-2">Analyzing Receipt...</p>
+                                            <p className="text-slate-400 text-xs">Extracting items, prices, and expiry dates with AI.</p>
+                                        </div>
+                                    )}
+
+                                    {modalStep === 'verify' && (
+                                        <div className="space-y-4">
+                                            {draftItems.map(item => (
+                                                <div key={item.id} className="bg-slate-50 p-4 rounded-2xl space-y-3 border border-slate-100">
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <div className="flex-1">
+                                                            <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Item Name</label>
+                                                            <input
+                                                                value={item.name}
+                                                                onChange={(e) => updateDraft(item.id, 'name', e.target.value)}
+                                                                className="bg-white border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 outline-none w-full focus:border-emerald-500 transition-colors"
+                                                                placeholder="Item Name"
+                                                            />
+                                                        </div>
+                                                        <button onClick={() => setDraftItems(prev => prev.filter(i => i.id !== item.id))} className="text-slate-400 hover:text-red-500 p-2 mt-4 bg-white rounded-lg border border-slate-200 hover:border-red-200 transition-colors">
+                                                            <X size={16} />
+                                                        </button>
+                                                    </div>
+                                                    <div className="grid grid-cols-3 gap-3">
+                                                        <div>
+                                                            <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Price ($)</label>
+                                                            <input type="number" value={item.price} onChange={(e) => updateDraft(item.id, 'price', parseFloat(e.target.value))}
+                                                                className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Qty</label>
+                                                            <input type="number" value={item.quantity || 1} onChange={(e) => updateDraft(item.id, 'quantity', parseInt(e.target.value))}
+                                                                className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Expiry</label>
+                                                            <input type="date" value={item.expiry} onChange={(e) => updateDraft(item.id, 'expiry', e.target.value)}
+                                                                className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Category</label>
+                                                        <select value={item.category} onChange={(e) => updateDraft(item.id, 'category', e.target.value)}
+                                                            className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors">
+                                                            {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                                        </select>
                                                     </div>
                                                 </div>
                                             ))}
-                                        </div>
-                                    </div>
-                                )
-                            ))
-                        )}
-                    </div>
-                )}
-                {/* Unified History Tab */}
-                {activeTab === 'history' && (
-                    <div className="space-y-4">
-                        {Object.entries(historyGroups).map(([date, items]) => (
-                            <div key={date}>
-                                <h3 className="sticky top-[140px] z-10 py-2 bg-slate-50/95 backdrop-blur text-xs font-black text-slate-400 uppercase tracking-widest pl-2 mb-2">
-                                    {new Date(date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-                                </h3>
-                                <div className="space-y-2">
-                                    {items.map(item => (
-                                        <div key={item.id} className={`bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between group ${item.type === 'waste' ? 'border-l-4 border-l-red-400' : 'border-l-4 border-l-emerald-400'}`}>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-2xl">{CATEGORIES[item.category]?.icon || '📦'}</span>
-                                                <div>
-                                                    <p className="font-black text-slate-800">{item.name}</p>
-                                                    <p className="text-xs text-slate-500 font-bold flex items-center gap-1">
-                                                        <span>{item.quantity}x</span>
-                                                        <span className="text-slate-300">•</span>
-                                                        <span>${item.price}</span>
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <button className="p-2 text-slate-300">
-                                                {/* No actions for history for now, just view */}
+                                            <button onClick={() => setDraftItems(prev => [...prev, { id: Math.random().toString(), name: 'New Item', price: 0, category: 'Other', expiry: new Date().toISOString().split('T')[0] }])}
+                                                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold text-xs flex items-center justify-center gap-2">
+                                                <Plus size={14} /> ADD ITEM
                                             </button>
+
+                                            <div className="pt-6">
+                                                <button onClick={addToFridge}
+                                                    className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-100 flex items-center justify-center gap-2">
+                                                    <CheckCircle2 /> SAVE TO FRIDGE
+                                                </button>
+                                            </div>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
-                        ))}
-                        {Object.keys(historyGroups).length === 0 && (
-                            <div className="text-center py-20 opacity-50">
-                                <History size={48} className="mx-auto mb-4 text-slate-300" />
-                                <p className="font-bold text-slate-400">No history found.</p>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </main>
-
-            {/* FAB (Lifted for Bottom Nav) - Hidden on Recipes Tab */}
-            {
-                activeTab !== 'recipes' && (
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="fixed bottom-24 right-6 w-14 h-14 bg-slate-900 text-white rounded-full shadow-xl shadow-slate-300 flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-20"
-                    >
-                        <Camera size={24} />
-                    </button>
-                )
-            }
-
-            {/* Bottom Navigation */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-6 py-4 flex justify-between items-center z-30 pb- safe-area-inset-bottom">
-                <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' ? 'text-emerald-600' : 'text-slate-300'}`}>
-                    <Home size={24} className={activeTab === 'home' ? 'fill-emerald-100' : ''} />
-                </button>
-                <button onClick={() => setActiveTab('fridge')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'fridge' ? 'text-emerald-600' : 'text-slate-300'}`}>
-                    <Refrigerator size={24} className={activeTab === 'fridge' ? 'fill-emerald-100' : ''} />
-                </button>
-                <button onClick={() => setActiveTab('recipes')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'recipes' ? 'text-emerald-600' : 'text-slate-300'}`}>
-                    <ChefHat size={24} className={activeTab === 'recipes' ? 'fill-emerald-100' : ''} />
-                </button>
-                <button onClick={() => setActiveTab('history')} className={`flex flex-col items-center gap-1 ${activeTab === 'history' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                    <History size={activeTab === 'history' ? 24 : 22} strokeWidth={activeTab === 'history' ? 3 : 2} />
-                </button>
-                <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'settings' ? 'text-emerald-600' : 'text-slate-300'}`}>
-                    <Settings size={24} className={activeTab === 'settings' ? 'fill-emerald-100' : ''} />
-                </button>
-            </div>
-
-            {/* Modal */}
-            {
-                isModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6">
-                        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-                        <div className="relative bg-white w-full max-w-md rounded-[2.5rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10 duration-300 max-h-[90vh] overflow-y-auto">
-
-                            {/* Modal Header */}
-                            <div className="flex justify-between items-center mb-8">
-                                <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                                    {modalStep === 'upload' && <><Camera className="text-emerald-500" /> SCAN RECEIPT</>}
-                                    {modalStep === 'loading' && <><Loader2 className="animate-spin text-emerald-500" /> PROCESSING</>}
-                                    {modalStep === 'verify' && <><CheckCircle2 className="text-emerald-500" /> VERIFY ITEMS</>}
+                        </div>
+                    )
+                }
+                {isManualAddOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                        <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-lg font-black text-slate-800 flex items-center gap-2 uppercase">
+                                    <Plus className="text-emerald-500" /> Add to {manualAddType}
                                 </h2>
-                                <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
+                                <button onClick={() => setIsManualAddOpen(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
                                     <X size={20} className="text-slate-500" />
                                 </button>
                             </div>
 
-                            {/* Modal Content */}
-                            <div className="min-h-[200px]">
-                                {modalStep === 'upload' && (
-                                    <div className="text-center py-10">
-                                        <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                                            <Camera className="text-emerald-500 w-10 h-10" />
-                                        </div>
-                                        <p className="text-slate-500 text-sm mb-8 px-4">
-                                            {isNative ? 'Take a photo of your receipt.' : 'Upload a clear photo of your receipt.'} OpenAI will automatically extract names, prices, and expiry dates.
-                                        </p>
-                                        {isNative ? (
-                                            <button
-                                                onClick={capturePhoto}
-                                                className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg">
-                                                TAKE PHOTO
-                                            </button>
-                                        ) : (
-                                            <label className="block w-full py-4 bg-emerald-600 text-white rounded-2xl font-black cursor-pointer text-center">
-                                                CHOOSE PHOTO
-                                                <input type="file" className="hidden" accept="image/*" onChange={processReceipt} />
-                                            </label>
-                                        )}
-                                    </div>
-                                )}
-
-                                {modalStep === 'loading' && (
-                                    <div className="text-center py-10">
-                                        <div className="relative w-20 h-20 mx-auto mb-6">
-                                            <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
-                                            <div className="absolute inset-0 border-4 border-emerald-500 rounded-full border-t-transparent animate-spin"></div>
-                                        </div>
-                                        <p className="font-black text-slate-800 mb-2">Analyzing Receipt...</p>
-                                        <p className="text-slate-400 text-xs">Extracting items, prices, and expiry dates with AI.</p>
-                                    </div>
-                                )}
-
-                                {modalStep === 'verify' && (
-                                    <div className="space-y-4">
-                                        {draftItems.map(item => (
-                                            <div key={item.id} className="bg-slate-50 p-4 rounded-2xl space-y-3 border border-slate-100">
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <div className="flex-1">
-                                                        <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Item Name</label>
-                                                        <input
-                                                            value={item.name}
-                                                            onChange={(e) => updateDraft(item.id, 'name', e.target.value)}
-                                                            className="bg-white border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 outline-none w-full focus:border-emerald-500 transition-colors"
-                                                            placeholder="Item Name"
-                                                        />
-                                                    </div>
-                                                    <button onClick={() => setDraftItems(prev => prev.filter(i => i.id !== item.id))} className="text-slate-400 hover:text-red-500 p-2 mt-4 bg-white rounded-lg border border-slate-200 hover:border-red-200 transition-colors">
-                                                        <X size={16} />
-                                                    </button>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-3">
-                                                    <div>
-                                                        <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Price ($)</label>
-                                                        <input type="number" value={item.price} onChange={(e) => updateDraft(item.id, 'price', parseFloat(e.target.value))}
-                                                            className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Qty</label>
-                                                        <input type="number" value={item.quantity || 1} onChange={(e) => updateDraft(item.id, 'quantity', parseInt(e.target.value))}
-                                                            className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Expiry</label>
-                                                        <input type="date" value={item.expiry} onChange={(e) => updateDraft(item.id, 'expiry', e.target.value)}
-                                                            className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors" />
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider ml-1">Category</label>
-                                                    <select value={item.category} onChange={(e) => updateDraft(item.id, 'category', e.target.value)}
-                                                        className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors">
-                                                        {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        <button onClick={() => setDraftItems(prev => [...prev, { id: Math.random().toString(), name: 'New Item', price: 0, category: 'Other', expiry: new Date().toISOString().split('T')[0] }])}
-                                            className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold text-xs flex items-center justify-center gap-2">
-                                            <Plus size={14} /> ADD ITEM
-                                        </button>
-
-                                        <div className="pt-6">
-                                            <button onClick={addToFridge}
-                                                className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-100 flex items-center justify-center gap-2">
-                                                <CheckCircle2 /> SAVE TO FRIDGE
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-            {isManualAddOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-                    <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-lg font-black text-slate-800 flex items-center gap-2 uppercase">
-                                <Plus className="text-emerald-500" /> Add to {manualAddType}
-                            </h2>
-                            <button onClick={() => setIsManualAddOpen(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
-                                <X size={20} className="text-slate-500" />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleManualAddSubmit} className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Item Name</label>
-                                <input name="name" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" placeholder="e.g. Milk" />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
+                            <form onSubmit={handleManualAddSubmit} className="space-y-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Quantity</label>
-                                    <input name="quantity" type="number" min="1" defaultValue="1" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Price ($)</label>
-                                    <input name="price" type="number" step="0.01" defaultValue="0.00" className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Category</label>
-                                <select name="category" className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none">
-                                    {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                </select>
-                            </div>
-
-                            {manualAddType === 'fridge' && (
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Expiry Date</label>
-                                    <input name="expiry" type="date" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" />
-                                </div>
-                            )}
-
-                            <button type="submit" className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-sm uppercase tracking-wide shadow-lg shadow-emerald-200 mt-4 active:scale-95 transition-all">
-                                Add Item
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Partial Waste Modal */}
-            {
-                wastingItem && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
-                        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setWastingItem(null)} />
-                        <div className="relative bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-                            <div className="text-center mb-6">
-                                <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
-                                    {wastingItem.emoji || '🗑️'}
-                                </div>
-                                <h3 className="text-lg font-black text-slate-800">How many wasted?</h3>
-                                <p className="text-slate-400 text-sm font-bold">You have {wastingItem.quantity} total.</p>
-                            </div>
-
-                            <div className="flex items-center justify-center gap-6 mb-8">
-                                <button
-                                    onClick={() => setWasteAmount(prev => Math.max(1, prev - 1))}
-                                    className="w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"
-                                >
-                                    <ArrowUpDown className="rotate-90" size={20} />
-                                </button>
-                                <span className="text-4xl font-black text-slate-800 tabular-nums">{wasteAmount}</span>
-                                <button
-                                    onClick={() => setWasteAmount(prev => Math.min(wastingItem.quantity, prev + 1))}
-                                    className="w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"
-                                >
-                                    <Plus size={24} />
-                                </button>
-                            </div>
-
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => confirmWaste(wastingItem, wasteAmount)}
-                                    className="w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-black shadow-lg shadow-red-200 transition-colors"
-                                >
-                                    CONFIRM WASTE
-                                </button>
-                                <button
-                                    onClick={() => setWastingItem(null)}
-                                    className="w-full py-3 text-slate-400 font-bold text-xs hover:text-slate-600"
-                                >
-                                    CANCEL
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Edit Modal */}
-            {
-                editingItem && (
-                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-6">
-                        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setEditingItem(null)} />
-                        <div className="relative bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                                    <Pencil size={20} className="text-emerald-500" /> EDIT DETAILS
-                                </h3>
-                                <button onClick={() => setEditingItem(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
-                                    <X size={20} />
-                                </button>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Item Name</label>
-                                    <input
-                                        type="text"
-                                        value={editingItem.name}
-                                        onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                                        className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
-                                    />
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Item Name</label>
+                                    <input name="name" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" placeholder="e.g. Milk" />
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Quantity</label>
-                                        <input
-                                            type="number"
-                                            value={editingItem.quantity}
-                                            onChange={(e) => setEditingItem({ ...editingItem, quantity: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
-                                        />
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Quantity</label>
+                                        <input name="quantity" type="number" min="1" defaultValue="1" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Price ($)</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={editingItem.price}
-                                            onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
-                                        />
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Price ($)</label>
+                                        <input name="price" type="number" step="0.01" defaultValue="0.00" className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Category</label>
+                                    <select name="category" className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none">
+                                        {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                    </select>
+                                </div>
+
+                                {manualAddType === 'fridge' && (
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Category</label>
-                                        <select
-                                            value={editingItem.category}
-                                            onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
-                                        >
-                                            {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                        </select>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Expiry Date</label>
+                                        <input name="expiry" type="date" required className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:border-emerald-500 outline-none" />
                                     </div>
-                                    {editType === 'fridge' && (
+                                )}
+
+                                <button type="submit" className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-sm uppercase tracking-wide shadow-lg shadow-emerald-200 mt-4 active:scale-95 transition-all">
+                                    Add Item
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Partial Waste Modal */}
+                {
+                    wastingItem && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setWastingItem(null)} />
+                            <div className="relative bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                                <div className="text-center mb-6">
+                                    <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
+                                        {wastingItem.emoji || '🗑️'}
+                                    </div>
+                                    <h3 className="text-lg font-black text-slate-800">How many wasted?</h3>
+                                    <p className="text-slate-400 text-sm font-bold">You have {wastingItem.quantity} total.</p>
+                                </div>
+
+                                <div className="flex items-center justify-center gap-6 mb-8">
+                                    <button
+                                        onClick={() => setWasteAmount(prev => Math.max(1, prev - 1))}
+                                        className="w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"
+                                    >
+                                        <ArrowUpDown className="rotate-90" size={20} />
+                                    </button>
+                                    <span className="text-4xl font-black text-slate-800 tabular-nums">{wasteAmount}</span>
+                                    <button
+                                        onClick={() => setWasteAmount(prev => Math.min(wastingItem.quantity, prev + 1))}
+                                        className="w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"
+                                    >
+                                        <Plus size={24} />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={() => confirmWaste(wastingItem, wasteAmount)}
+                                        className="w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-black shadow-lg shadow-red-200 transition-colors"
+                                    >
+                                        CONFIRM WASTE
+                                    </button>
+                                    <button
+                                        onClick={() => setWastingItem(null)}
+                                        className="w-full py-3 text-slate-400 font-bold text-xs hover:text-slate-600"
+                                    >
+                                        CANCEL
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Edit Modal */}
+                {
+                    editingItem && (
+                        <div className="fixed inset-0 z-[70] flex items-center justify-center p-6">
+                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setEditingItem(null)} />
+                            <div className="relative bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                        <Pencil size={20} className="text-emerald-500" /> EDIT DETAILS
+                                    </h3>
+                                    <button onClick={() => setEditingItem(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Item Name</label>
+                                        <input
+                                            type="text"
+                                            value={editingItem.name}
+                                            onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Expiry</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Quantity</label>
                                             <input
-                                                type="date"
-                                                value={editingItem.expiry}
-                                                onChange={(e) => setEditingItem({ ...editingItem, expiry: e.target.value })}
+                                                type="number"
+                                                value={editingItem.quantity}
+                                                onChange={(e) => setEditingItem({ ...editingItem, quantity: e.target.value })}
                                                 className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
                                             />
                                         </div>
-                                    )}
-                                </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Price ($)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={editingItem.price}
+                                                onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
+                                                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                            />
+                                        </div>
+                                    </div>
 
-                                <button
-                                    onClick={handleEditSave}
-                                    className="w-full py-4 mt-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black shadow-lg shadow-emerald-100 transition-colors"
-                                >
-                                    SAVE CHANGES
-                                </button>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Category</label>
+                                            <select
+                                                value={editingItem.category}
+                                                onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                                                className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                            >
+                                                {Object.keys(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                            </select>
+                                        </div>
+                                        {editType === 'fridge' && (
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1 mb-1 block">Expiry</label>
+                                                <input
+                                                    type="date"
+                                                    value={editingItem.expiry}
+                                                    onChange={(e) => setEditingItem({ ...editingItem, expiry: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 transition-colors"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <button
+                                        onClick={handleEditSave}
+                                        className="w-full py-4 mt-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black shadow-lg shadow-emerald-100 transition-colors"
+                                    >
+                                        SAVE CHANGES
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )
-            }
-        </div >
+                    )
+                }
+
+                {/* Bottom Navigation - Mobile Only */}
+                <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-6 py-4 flex justify-between items-center z-30 pb-safe-area-inset-bottom">
+                    <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' ? 'text-emerald-600' : 'text-slate-300'}`}>
+                        <Home size={24} className={activeTab === 'home' ? 'fill-emerald-100' : ''} />
+                    </button>
+                    <button onClick={() => setActiveTab('fridge')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'fridge' ? 'text-emerald-600' : 'text-slate-300'}`}>
+                        <Refrigerator size={24} className={activeTab === 'fridge' ? 'fill-emerald-100' : ''} />
+                    </button>
+                    <button onClick={() => setActiveTab('recipes')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'recipes' ? 'text-emerald-600' : 'text-slate-300'}`}>
+                        <ChefHat size={24} className={activeTab === 'recipes' ? 'fill-emerald-100' : ''} />
+                    </button>
+                    <button onClick={() => setActiveTab('history')} className={`flex flex-col items-center gap-1 ${activeTab === 'history' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                        <History size={activeTab === 'history' ? 24 : 22} strokeWidth={activeTab === 'history' ? 3 : 2} />
+                    </button>
+                    <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'settings' ? 'text-emerald-600' : 'text-slate-300'}`}>
+                        <Settings size={24} className={activeTab === 'settings' ? 'fill-emerald-100' : ''} />
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }
-
