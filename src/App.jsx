@@ -385,24 +385,53 @@ export default function App() {
         }
 
         setIsTyping(true);
-        setRecipeLoading(true); // Keep legacy loading state for safety if used elsewhere
+        setRecipeLoading(true);
 
         try {
-            const { data, error } = await supabase.functions.invoke('generate-recipe', {
-                body: { items: items, type, customPrompt } // specific 'items' (fridge items)
+            // Prepare items context
+            const fridgeItems = items.map(i => `${i.name} (Qty: ${i.quantity || 1}, Expires: ${i.expiry})`).join(', ');
+
+            let systemPrompt = "You are a professional chef. Suggest 3 recipes based on the items in the user's fridge. Format each recipe with a title (starting with #), ingredients list (starting with ### Ingredients), and instructions (starting with ### Instructions). Use simple markdown.";
+            let userPrompt = "";
+
+            if (type === 'expiring') {
+                userPrompt = `I have these items: ${fridgeItems}. Please suggest a recipe that prioritizes using the items expiring soon.`;
+            } else if (type === 'surprise') {
+                userPrompt = `I have these items: ${fridgeItems}. Surprise me with a creative recipe!`;
+            } else {
+                userPrompt = `${customPrompt}. (Available items: ${fridgeItems})`;
+            }
+
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    temperature: 0.7
+                })
             });
 
-            if (error) throw error;
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error?.message || 'API request failed');
+
+            const recipeText = result.choices[0].message.content;
 
             // Add Assistant Message
             setChatMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                text: data.recipe,
+                text: recipeText,
                 isRecipe: true
             }]);
 
-            // Update Limit
+            // Update Limit (Database only)
             const { error: upsertError } = await supabase
                 .from('daily_recipe_counts')
                 .upsert({
@@ -1484,7 +1513,7 @@ export default function App() {
                         )}
                     </header>
                 )}
-                <main className="max-w-md mx-auto p-6 pb-28 space-y-8">
+                <main className={`max-w-md mx-auto ${activeTab === 'recipes' ? 'p-0 h-[calc(100vh-75px)] lg:h-screen overflow-hidden' : 'p-6 pb-28 space-y-8'}`}>
                     {activeTab === 'home' && (
                         <div className="space-y-6">
                             {/* Welcome */}
@@ -1826,7 +1855,7 @@ export default function App() {
                     )}
 
                     {activeTab === 'recipes' && (
-                        <div className="flex flex-col h-[calc(100vh-180px)]">
+                        <div className="flex flex-col h-full relative">
                             {/* Chat Header */}
                             <div className="bg-white p-4 rounded-b-[2rem] shadow-sm border-b border-slate-100 flex items-center justify-between z-10">
                                 <div className="flex items-center gap-3">
@@ -1847,7 +1876,7 @@ export default function App() {
                             </div>
 
                             {/* Chat Feed */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-40">
                                 {chatMessages.map((msg) => (
                                     <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-in slide-in-from-bottom-2`}>
                                         {/* Avatar */}
@@ -1887,7 +1916,7 @@ export default function App() {
                             </div>
 
                             {/* Input Area (Fixed) */}
-                            <div className="absolute bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent">
+                            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent backdrop-blur-sm z-20">
                                 {/* Quick Replies (Only if not typing and limit not reached) */}
                                 {!isTyping && dailyRecipeCount < 2 && (
                                     <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide px-2">
