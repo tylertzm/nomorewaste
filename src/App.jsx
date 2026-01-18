@@ -1380,6 +1380,28 @@ export default function App() {
                             SPOILESS BILLS
                         </h1>
                     </div>
+
+                    {/* Desktop Quick Actions */}
+                    <div className="space-y-3 mt-4 mb-2">
+                        <button
+                            onClick={() => { setModalStep('upload'); setIsModalOpen(true); }}
+                            className="w-full flex items-center gap-3 bg-emerald-600 text-white px-4 py-3.5 rounded-2xl font-black text-xs hover-lift shadow-xl shadow-emerald-200/50 transition-all border border-emerald-500/20 group"
+                        >
+                            <div className="bg-white/20 p-1.5 rounded-lg group-hover:bg-white/30 transition-colors">
+                                <Plus size={16} />
+                            </div>
+                            {t('common.scan').toUpperCase()}
+                        </button>
+                        <button
+                            onClick={() => { setManualAddType('fridge'); setIsManualAddOpen(true); }}
+                            className="w-full flex items-center gap-3 bg-white text-slate-700 px-4 py-3.5 rounded-2xl font-black text-xs hover-lift shadow-lg shadow-slate-100 transition-all border border-slate-200 group hover:border-emerald-500 hover:text-emerald-600"
+                        >
+                            <div className="bg-slate-100 p-1.5 rounded-lg group-hover:bg-emerald-100 transition-colors">
+                                <List size={16} />
+                            </div>
+                            {t('common.add').toUpperCase()}
+                        </button>
+                    </div>
                     <nav className="flex flex-1 flex-col">
                         <ul role="list" className="flex flex-1 flex-col gap-y-2">
                             <li>
