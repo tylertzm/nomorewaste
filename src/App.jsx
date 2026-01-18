@@ -155,13 +155,6 @@ export default function App() {
 
     // Chat State
     const [chatMessages, setChatMessages] = useState([]);
-    useEffect(() => {
-        if (chatMessages.length === 0) {
-            setChatMessages([
-                { id: '1', role: 'assistant', text: t('recipes.welcome') || "Hello Chef! 👨‍🍳 I'm ready to cook. Tell me what you're craving, or pick a quick option below!" }
-            ]);
-        }
-    }, [language]);
     const [chatInput, setChatInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef(null);
@@ -200,6 +193,14 @@ export default function App() {
 
     useEffect(() => {
         localStorage.setItem('language', language);
+    }, [language]);
+
+    useEffect(() => {
+        if (chatMessages.length === 0) {
+            setChatMessages([
+                { id: '1', role: 'assistant', text: t('recipes.welcome') || "Hello Chef! 👨‍🍳 I'm ready to cook. Tell me what you're craving, or pick a quick option below!" }
+            ]);
+        }
     }, [language]);
 
     // AI Chef State
