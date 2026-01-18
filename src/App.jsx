@@ -37,6 +37,7 @@ import { Capacitor } from '@capacitor/core';
 import { supabase } from './supabase';
 import Auth from './Auth';
 import Landing from './Landing';
+import translations from './i18n';
 
 const SimpleMarkdownRenderer = ({ content }) => {
     if (!content) return null;
@@ -163,6 +164,24 @@ export default function App() {
     const [joinCode, setJoinCode] = useState('');
     const [view, setView] = useState('loading');
     const [showLanding, setShowLanding] = useState(true);
+    const [language, setLanguage] = useState(localStorage.getItem('language') || 'en');
+
+    const t = (path) => {
+        const keys = path.split('.');
+        let result = translations[language];
+        for (const key of keys) {
+            if (result && result[key]) {
+                result = result[key];
+            } else {
+                return path;
+            }
+        }
+        return result;
+    };
+
+    useEffect(() => {
+        localStorage.setItem('language', language);
+    }, [language]);
 
     // AI Chef State
     const [dailyRecipeCount, setDailyRecipeCount] = useState(0);
@@ -608,6 +627,34 @@ export default function App() {
             refreshData(currentFridgeId);
         }
     };
+    const updateConsumedLog = async (id, updates) => {
+        const { error } = await supabase
+            .from('consumed_logs')
+            .update(updates)
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error updating consumed log:', error);
+            alert('Failed to update log');
+        } else {
+            refreshData(currentFridgeId);
+        }
+    };
+
+    const deleteHistoryItem = async (id, type) => {
+        const table = type === 'waste' ? 'waste_logs' : 'consumed_logs';
+        const { error } = await supabase
+            .from(table)
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error deleting log:', error);
+            alert('Failed to delete log');
+        } else {
+            refreshData(currentFridgeId);
+        }
+    };
 
     const handleEditSave = async () => {
         if (!editingItem) return;
@@ -622,9 +669,10 @@ export default function App() {
         if (editType === 'fridge') {
             updates.expiry = editingItem.expiry;
             await updateItem(editingItem.id, updates);
-        } else {
-            // For waste logs, we might allow editing the date too if needed, but for now just details
+        } else if (editType === 'waste') {
             await updateWasteLog(editingItem.id, updates);
+        } else if (editType === 'consumed') {
+            await updateConsumedLog(editingItem.id, updates);
         }
 
         setEditingItem(null);
@@ -1112,7 +1160,7 @@ export default function App() {
                                         }`}
                                 >
                                     <Home size={20} />
-                                    Home
+                                    {t('nav.home')}
                                 </button>
                             </li>
                             <li>
@@ -1124,7 +1172,7 @@ export default function App() {
                                         }`}
                                 >
                                     <Refrigerator size={20} />
-                                    Fridge
+                                    {t('nav.fridge')}
                                     {items.length > 0 && (
                                         <span className="ml-auto inline-flex items-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">
                                             {items.length}
@@ -1141,7 +1189,7 @@ export default function App() {
                                         }`}
                                 >
                                     <History size={20} />
-                                    History
+                                    {t('nav.history')}
                                 </button>
                             </li>
                             <li>
@@ -1153,9 +1201,9 @@ export default function App() {
                                         }`}
                                 >
                                     <Bot size={20} />
-                                    AI Chef
+                                    {t('nav.recipes')}
                                     {dailyRecipeCount >= 10 && (
-                                        <span className="ml-auto text-xs text-amber-600 font-bold">Limit</span>
+                                        <span className="ml-auto text-xs text-amber-600 font-bold">{t('recipes.limit')}</span>
                                     )}
                                 </button>
                             </li>
@@ -1168,7 +1216,7 @@ export default function App() {
                                         }`}
                                 >
                                     <Settings size={20} />
-                                    Settings
+                                    {t('nav.settings')}
                                 </button>
                             </li>
                         </ul>
@@ -1276,9 +1324,9 @@ export default function App() {
                         <div className="space-y-6">
                             {/* Welcome */}
                             <div className="flex justify-between items-center px-2">
-                                <div>
-                                    <h2 className="text-2xl font-black text-slate-800">Hello, Chef! 👨‍🍳</h2>
-                                    <p className="text-slate-400 font-bold text-sm">Here's your kitchen status.</p>
+                                <div className="space-y-1">
+                                    <h2 className="text-3xl font-black tracking-tighter text-slate-800">{t('home.welcome')}</h2>
+                                    <p className="text-slate-400 font-bold text-sm">{t('settings.account')}</p>
                                 </div>
                             </div>
 
@@ -1289,10 +1337,10 @@ export default function App() {
                                     <div className="absolute right-[-20px] top-[-20px] opacity-10 rotate-12">
                                         <Refrigerator size={140} />
                                     </div>
-                                    <p className="text-xs font-black uppercase opacity-80 tracking-widest">Total Fridge Value</p>
+                                    <p className="text-xs font-black uppercase opacity-80 tracking-widest">{t('home.stats.items_count')}</p>
                                     <div>
-                                        <p className="text-5xl font-black tracking-tighter">${totalValue.toFixed(2)}</p>
-                                        <p className="text-emerald-100 font-bold text-xs mt-1">{items.length} items stocked</p>
+                                        <p className="text-5xl font-black tracking-tighter">{items.length}</p>
+                                        <p className="text-emerald-100 font-bold text-xs mt-1">{t('common.items')}</p>
                                     </div>
                                 </div>
 
@@ -1304,7 +1352,7 @@ export default function App() {
                                             <Trash2 size={20} />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-black uppercase text-slate-400">Wasted Loss</p>
+                                            <p className="text-[10px] font-black uppercase text-slate-400">{t('home.stats.waste_prevented')}</p>
                                             <p className="text-2xl font-black text-slate-800">${totalWasted.toFixed(2)}</p>
                                         </div>
                                     </div>
@@ -1315,11 +1363,11 @@ export default function App() {
                                             <Clock size={20} />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-black uppercase text-amber-500">Expiring Soon</p>
+                                            <p className="text-[10px] font-black uppercase text-amber-500">{t('home.stats.expiring_soon')}</p>
                                             <p className="text-2xl font-black text-amber-700">{items.filter(i => {
                                                 const days = Math.ceil((new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24));
                                                 return days <= 3 && days >= 0;
-                                            }).length} <span className="text-xs font-bold opacity-60">items</span></p>
+                                            }).length} <span className="text-xs font-bold opacity-60">{t('common.items')}</span></p>
                                         </div>
                                     </div>
                                 </div>
@@ -1328,7 +1376,7 @@ export default function App() {
                             {/* Recent Activity Feed */}
                             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                    <Bell size={14} /> Recent Activity
+                                    <Bell size={14} /> {t('home.activity')}
                                 </h3>
                                 <div className="space-y-4">
                                     {activityLogs.length === 0 ? (
@@ -1359,11 +1407,11 @@ export default function App() {
                             <div className="grid grid-cols-2 gap-4">
                                 <button onClick={() => setIsModalOpen(true)} className="p-4 bg-slate-900 text-white rounded-[2rem] shadow-xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform">
                                     <Camera size={28} />
-                                    <span className="text-xs font-black uppercase">Scan Receipt</span>
+                                    <span className="text-xs font-black uppercase">{t('common.scan')}</span>
                                 </button>
                                 <button onClick={() => setActiveTab('fridge')} className="p-4 bg-white border border-slate-200 rounded-[2rem] flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
                                     <Refrigerator size={28} className="text-emerald-500" />
-                                    <span className="text-xs font-black uppercase text-slate-600">Check Fridge</span>
+                                    <span className="text-xs font-black uppercase text-slate-600">{t('nav.fridge')}</span>
                                 </button>
                             </div>
                         </div>
@@ -1371,14 +1419,40 @@ export default function App() {
 
                     {activeTab === 'settings' && (
                         <div className="space-y-6">
+                            {/* Language Switcher */}
+                            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                                <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+                                    <List size={20} className="text-emerald-500" /> {t('settings.language')}
+                                </h2>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {[
+                                        { code: 'en', label: 'English' },
+                                        { code: 'zh', label: '中文' },
+                                        { code: 'ko', label: '한국어' },
+                                        { code: 'de', label: 'Deutsch' }
+                                    ].map(lang => (
+                                        <button
+                                            key={lang.code}
+                                            onClick={() => setLanguage(lang.code)}
+                                            className={`py-3 px-4 rounded-xl font-bold text-sm transition-all ${language === lang.code
+                                                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200'
+                                                : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                                }`}
+                                        >
+                                            {lang.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             {/* Profile Card */}
                             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                                 <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
-                                    <User size={20} className="text-emerald-500" /> PROFILE
+                                    <User size={20} className="text-emerald-500" /> {t('settings.account')}
                                 </h2>
                                 <p className="text-slate-500 text-sm font-bold mb-4">{session?.user?.email}</p>
                                 <button onClick={handleSignOut} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors">
-                                    <LogOut size={14} /> SIGN OUT
+                                    <LogOut size={14} /> {t('settings.logout')}
                                 </button>
                             </div>
 
@@ -1537,15 +1611,15 @@ export default function App() {
                                         <ChefHat size={20} className="text-emerald-600" />
                                     </div>
                                     <div>
-                                        <h2 className="text-sm font-black text-slate-800">AI Chef</h2>
+                                        <h2 className="text-sm font-black text-slate-800">{t('recipes.title')}</h2>
                                         <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
                                             <span className={`w-1.5 h-1.5 rounded-full ${dailyRecipeCount >= 2 ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-                                            {dailyRecipeCount >= 2 ? 'Off Duty (Limit Reached)' : 'Online'}
+                                            {dailyRecipeCount >= 2 ? t('recipes.offline') : t('recipes.online')}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                                    <p className="text-[10px] font-black text-slate-500">{dailyRecipeCount}/2 Recipes</p>
+                                    <p className="text-[10px] font-black text-slate-500">{dailyRecipeCount}/2 {t('nav.recipes')}</p>
                                 </div>
                             </div>
 
@@ -1630,23 +1704,23 @@ export default function App() {
                             {/* Quick Stats Summary - Fridge */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">In Fridge</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('fridge.title')}</p>
                                     <p className="text-2xl font-black text-slate-900">${filteredItems.reduce((acc, curr) => acc + ((curr.price || 0) * (curr.quantity || 1)), 0).toFixed(2)}</p>
                                 </div>
                                 <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-                                    <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Expiring Soon</p>
+                                    <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">{t('home.stats.expiring_soon')}</p>
                                     <p className="text-2xl font-black text-amber-600">{filteredItems.filter(i => {
                                         const days = Math.ceil((new Date(i.expiry) - new Date()) / (1000 * 60 * 60 * 24));
                                         return days <= 3 && days >= 0;
-                                    }).length} <span className="text-xs font-bold opacity-60">items</span></p>
+                                    }).length} <span className="text-xs font-bold opacity-60">{t('common.items')}</span></p>
                                 </div>
                             </div>
 
                             {filteredItems.length === 0 ? (
                                 <div className="text-center py-20 opacity-40">
                                     <Refrigerator className="w-12 h-12 mx-auto mb-4 stroke-1" />
-                                    <p className="font-bold">No items found</p>
-                                    <p className="text-sm">Try adjusting your filters</p>
+                                    <p className="font-bold">{t('fridge.empty')}</p>
+                                    <p className="text-sm">{t('fridge.adjust_filters')}</p>
                                 </div>
                             ) : (
                                 Object.entries(groupItemsByDate(filteredItems)).map(([dateLabel, groupItems]) => (
@@ -1688,13 +1762,13 @@ export default function App() {
                                                                 {openMenuId === item.id && (
                                                                     <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-20 min-w-[140px] flex flex-col gap-1 animate-in fade-in zoom-in-95 origin-top-right">
                                                                         <button onClick={() => { setEditingItem(item); setEditType('fridge'); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-600">
-                                                                            <Pencil size={14} /> Edit
+                                                                            <Pencil size={14} /> {t('common.edit')}
                                                                         </button>
                                                                         <button onClick={() => { markConsumed(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-emerald-50 rounded-lg text-xs font-bold text-emerald-600">
-                                                                            <CheckCircle2 size={14} /> Consumed
+                                                                            <CheckCircle2 size={14} /> {t('common.consume')}
                                                                         </button>
                                                                         <button onClick={() => { markWasted(item.id); setOpenMenuId(null); }} className="flex items-center gap-2 p-3 hover:bg-red-50 rounded-lg text-xs font-bold text-red-500">
-                                                                            <Trash2 size={14} /> Wasted
+                                                                            <Trash2 size={14} /> {t('history.wasted')}
                                                                         </button>
                                                                     </div>
                                                                 )}
@@ -1811,9 +1885,33 @@ export default function App() {
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <button className="p-2 text-slate-300">
-                                                    {/* No actions for history for now, just view */}
-                                                </button>
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.id ? null : item.id); }}
+                                                        className="p-2 text-slate-300 hover:text-slate-600 rounded-lg"
+                                                    >
+                                                        <MoreVertical size={16} />
+                                                    </button>
+                                                    {openMenuId === item.id && (
+                                                        <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-20 min-w-[140px] flex flex-col gap-1 animate-in fade-in zoom-in-95 origin-top-right">
+                                                            <button
+                                                                onClick={() => { setEditingItem(item); setEditType(item.type === 'waste' ? 'waste' : 'consumed'); setOpenMenuId(null); }}
+                                                                className="flex items-center gap-2 p-3 hover:bg-slate-50 rounded-lg text-xs font-bold text-slate-600"
+                                                            >
+                                                                <Pencil size={14} /> {t('common.edit')}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { deleteHistoryItem(item.id, item.type); setOpenMenuId(null); }}
+                                                                className="flex items-center gap-2 p-3 hover:bg-red-50 rounded-lg text-xs font-bold text-red-500"
+                                                            >
+                                                                <Trash2 size={14} /> {t('common.delete')}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {openMenuId === item.id && (
+                                                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                                                    )}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -1822,7 +1920,7 @@ export default function App() {
                             {Object.keys(historyGroups).length === 0 && (
                                 <div className="text-center py-20 opacity-50">
                                     <History size={48} className="mx-auto mb-4 text-slate-300" />
-                                    <p className="font-bold text-slate-400">No history found.</p>
+                                    <p className="font-bold text-slate-400">{t('history.empty')}</p>
                                 </div>
                             )}
                         </div>
@@ -1852,9 +1950,9 @@ export default function App() {
                                 {/* Modal Header */}
                                 <div className="flex justify-between items-center mb-8">
                                     <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                                        {modalStep === 'upload' && <><Camera className="text-emerald-500" /> SCAN RECEIPT</>}
-                                        {modalStep === 'loading' && <><Loader2 className="animate-spin text-emerald-500" /> PROCESSING</>}
-                                        {modalStep === 'verify' && <><CheckCircle2 className="text-emerald-500" /> VERIFY ITEMS</>}
+                                        {modalStep === 'upload' && <><Camera className="text-emerald-500" /> {t('common.scan')}</>}
+                                        {modalStep === 'loading' && <><Loader2 className="animate-spin text-emerald-500" /> {t('common.loading')}</>}
+                                        {modalStep === 'verify' && <><CheckCircle2 className="text-emerald-500" /> {t('common.save')}</>}
                                     </h2>
                                     <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
                                         <X size={20} className="text-slate-500" />
