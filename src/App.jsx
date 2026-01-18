@@ -658,7 +658,13 @@ export default function App() {
     };
 
     const deleteHistoryItem = async (id, type) => {
+        if (!id) return;
+        const confirmed = window.confirm(`Permanently delete this ${type} record?`);
+        if (!confirmed) return;
+
         const table = type === 'waste' ? 'waste_logs' : 'consumed_logs';
+        console.log(`Deleting ${type} with ID ${id} from ${table}`);
+
         const { error } = await supabase
             .from(table)
             .delete()
@@ -666,10 +672,22 @@ export default function App() {
 
         if (error) {
             console.error('Error deleting log:', error);
-            alert('Failed to delete log');
+            alert(`Failed to delete log: ${error.message}`);
         } else {
+            console.log('Delete successful');
             await logActivity('DELETE_HISTORY', type, `Deleted ${type} log entry`);
-            refreshData(currentFridgeId);
+
+            // Explicitly use the current fridge ID to avoid any state delay issues
+            if (currentFridgeId) {
+                await refreshData(currentFridgeId);
+            } else {
+                // Secondary fallback: Fetch fridge ID again if needed
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data: fu } = await supabase.from('fridge_users').select('fridge_id').eq('user_id', user.id).single();
+                    if (fu) refreshData(fu.fridge_id);
+                }
+            }
         }
     };
 
@@ -735,23 +753,12 @@ export default function App() {
         const item = items.find(i => i.id === id);
         if (!item) return;
 
-        // Optimistic Remove/Update
+        // Optimistic Remove/Update from items list
         if (item.quantity > 1) {
             setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: i.quantity - 1 } : i));
         } else {
             setItems(prev => prev.filter(i => i.id !== id));
         }
-
-        // Optimistic Add to Consumed
-        const consumedLog = {
-            id: Math.random(), // temp id
-            name: item.name,
-            category: item.category,
-            price: item.price,
-            quantity: 1,
-            consumed_at: new Date().toISOString()
-        };
-        setConsumedHistory(prev => [consumedLog, ...prev]);
 
         // DB Updates
         const { data: { user } } = await supabase.auth.getUser();
@@ -797,9 +804,7 @@ export default function App() {
     };
 
     const confirmWaste = async (item, amount) => {
-        // Optimistic update
-        setWasteHistory(prev => [{ ...item, quantity: amount, wastedAt: new Date().toISOString() }, ...prev]);
-
+        // Optimistic update items list
         if (amount < item.quantity) {
             setItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity - amount } : i));
         } else {
