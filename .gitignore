@@ -27,3 +27,10 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Capacitor
+ios/App/Pods
+ios/App/App/public
+android/app/src/main/assets/public
+android/app/build
+.capacitor

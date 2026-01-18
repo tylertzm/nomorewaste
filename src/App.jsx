@@ -11,6 +11,8 @@ import {
     Plus,
     Loader2
 } from 'lucide-react';
+import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
 
 const CATEGORIES = {
     Produce: { icon: '🥦', color: 'bg-green-100 text-green-600' },
@@ -47,6 +49,27 @@ export default function App() {
         localStorage.setItem('nfw_waste', JSON.stringify(wasteHistory));
     }, [items, wasteHistory]);
 
+    const capturePhoto = async () => {
+        setModalStep('loading');
+        setIsProcessing(true);
+
+        try {
+            const photo = await CapCamera.getPhoto({
+                quality: 90,
+                allowEditing: false,
+                resultType: CameraResultType.Base64,
+                source: CameraSource.Camera
+            });
+
+            await analyzeReceipt(photo.base64String);
+        } catch (error) {
+            console.error("Camera Error:", error);
+            alert(`Failed to capture photo: ${error.message}`);
+            setModalStep('upload');
+            setIsProcessing(false);
+        }
+    };
+
     const processReceipt = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -57,67 +80,70 @@ export default function App() {
         const reader = new FileReader();
         reader.onload = async () => {
             const base64Data = reader.result.split(',')[1];
-
-            const systemPrompt = "You are a grocery receipt parser. Extract items into a JSON array. For each item include: 'name', 'price' (number), 'category' (Produce, Dairy, Meat, Beverage, Pantry, Bakery, Frozen, Other), and 'expiry' (estimate YYYY-MM-DD based on today's date). Return ONLY valid JSON with no additional text.";
-            const userPrompt = `Parse this receipt. Today is ${new Date().toISOString().split('T')[0]}.`;
-
-            try {
-                const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model: 'gpt-4o-mini',
-                        messages: [
-                            {
-                                role: 'system',
-                                content: systemPrompt
-                            },
-                            {
-                                role: 'user',
-                                content: [
-                                    {
-                                        type: 'text',
-                                        text: userPrompt
-                                    },
-                                    {
-                                        type: 'image_url',
-                                        image_url: {
-                                            url: `data:image/jpeg;base64,${base64Data}`
-                                        }
-                                    }
-                                ]
-                            }
-                        ],
-                        response_format: { type: 'json_object' }
-                    })
-                });
-
-                const result = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(result.error?.message || 'API request failed');
-                }
-
-                const text = result.choices[0].message.content;
-                const parsed = JSON.parse(text);
-
-                // Handle both array format and object with items array
-                const itemsArray = Array.isArray(parsed) ? parsed : (parsed.items || []);
-
-                setDraftItems(itemsArray.map(i => ({ ...i, id: Math.random().toString(36).substr(2, 9) })));
-                setModalStep('verify');
-            } catch (error) {
-                console.error("OpenAI Error:", error);
-                alert(`Failed to read receipt: ${error.message}. Please try a clearer photo.`);
-                setModalStep('upload');
-            } finally {
-                setIsProcessing(false);
-            }
+            await analyzeReceipt(base64Data);
         };
         reader.readAsDataURL(file);
+    };
+
+    const analyzeReceipt = async (base64Data) => {
+        const systemPrompt = "You are a grocery receipt parser. Extract items into a JSON array. For each item include: 'name', 'price' (number), 'category' (Produce, Dairy, Meat, Beverage, Pantry, Bakery, Frozen, Other), and 'expiry' (estimate YYYY-MM-DD based on today's date). Return ONLY valid JSON with no additional text.";
+        const userPrompt = `Parse this receipt. Today is ${new Date().toISOString().split('T')[0]}.`;
+
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: systemPrompt
+                        },
+                        {
+                            role: 'user',
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: userPrompt
+                                },
+                                {
+                                    type: 'image_url',
+                                    image_url: {
+                                        url: `data:image/jpeg;base64,${base64Data}`
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    response_format: { type: 'json_object' }
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error?.message || 'API request failed');
+            }
+
+            const text = result.choices[0].message.content;
+            const parsed = JSON.parse(text);
+
+            // Handle both array format and object with items array
+            const itemsArray = Array.isArray(parsed) ? parsed : (parsed.items || []);
+
+            setDraftItems(itemsArray.map(i => ({ ...i, id: Math.random().toString(36).substr(2, 9) })));
+            setModalStep('verify');
+        } catch (error) {
+            console.error("OpenAI Error:", error);
+            alert(`Failed to read receipt: ${error.message}. Please try a clearer photo.`);
+            setModalStep('upload');
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const addToFridge = () => {
@@ -146,6 +172,7 @@ export default function App() {
 
     const totalValue = items.reduce((acc, curr) => acc + (curr.price || 0), 0);
     const totalWasted = wasteHistory.reduce((acc, curr) => acc + (curr.price || 0), 0);
+    const isNative = Capacitor.isNativePlatform();
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-emerald-100">
@@ -284,11 +311,21 @@ export default function App() {
                                     <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
                                         <Camera className="text-emerald-500 w-10 h-10" />
                                     </div>
-                                    <p className="text-slate-500 text-sm mb-8 px-4">Upload a clear photo of your receipt. OpenAI will automatically extract names, prices, and expiry dates.</p>
-                                    <label className="block w-full py-4 bg-emerald-600 text-white rounded-2xl font-black cursor-pointer text-center">
-                                        CHOOSE PHOTO
-                                        <input type="file" className="hidden" accept="image/*" onChange={processReceipt} />
-                                    </label>
+                                    <p className="text-slate-500 text-sm mb-8 px-4">
+                                        {isNative ? 'Take a photo of your receipt.' : 'Upload a clear photo of your receipt.'} OpenAI will automatically extract names, prices, and expiry dates.
+                                    </p>
+                                    {isNative ? (
+                                        <button
+                                            onClick={capturePhoto}
+                                            className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg">
+                                            TAKE PHOTO
+                                        </button>
+                                    ) : (
+                                        <label className="block w-full py-4 bg-emerald-600 text-white rounded-2xl font-black cursor-pointer text-center">
+                                            CHOOSE PHOTO
+                                            <input type="file" className="hidden" accept="image/*" onChange={processReceipt} />
+                                        </label>
+                                    )}
                                 </div>
                             )}
 

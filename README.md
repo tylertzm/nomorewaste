@@ -56,11 +56,61 @@ npm run dev
 
 ## Usage
 
+### Web App
 1. **Scan Receipt**: Click the "SCAN RECEIPT" button
 2. **Upload Photo**: Choose a clear photo of your grocery receipt
 3. **Verify Items**: Review and edit the AI-extracted items
 4. **Track Food**: Monitor expiry dates and mark items as consumed or wasted
 5. **View Analytics**: Switch to the "Wastage" tab to see your waste statistics
+
+### Mobile App (iOS/Android)
+1. **Build & Deploy**: Follow the mobile build instructions below
+2. **Take Photo**: Use the native camera to capture receipt photos
+3. **Everything Else**: Same as web app functionality
+
+## Mobile Apps
+
+This project supports **iOS and Android** via Capacitor!
+
+### Quick Start - Mobile Development
+
+```bash
+# Build web assets
+npm run build
+
+# Sync to native projects
+npx cap sync
+
+# Open in Xcode (iOS)
+npx cap open ios
+
+# Open in Android Studio (Android)
+npx cap open android
+```
+
+### Mobile Features
+- ✅ **Native Camera** - Direct camera access on mobile devices
+- ✅ **File Upload Fallback** - Works on web browsers too
+- ✅ **Same Codebase** - One React app for all platforms
+- ✅ **Auto Permissions** - Camera permissions handled automatically
+
+### Requirements
+
+**For iOS builds:**
+- macOS with Xcode installed
+- Apple Developer account (for device testing)
+
+**For Android builds:**
+- Android Studio installed
+- Android SDK configured
+
+### Detailed Mobile Setup
+
+See [mobile_walkthrough.md](file:///Users/tyler/.gemini/antigravity/brain/08e95a72-2bad-410b-af09-c5cdfd391300/mobile_walkthrough.md) for complete instructions on:
+- Building for iOS and Android
+- Testing on simulators/emulators
+- Deploying to App Store/Play Store
+- Configuring app icons and metadata
 
 ## Development
 
