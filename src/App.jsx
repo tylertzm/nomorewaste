@@ -676,10 +676,18 @@ export default function App() {
     const handleEditSave = async () => {
         if (!editingItem) return;
 
+        const quantity = parseInt(editingItem.quantity);
+        const price = parseFloat(editingItem.price);
+
+        if (isNaN(quantity) || isNaN(price)) {
+            alert("Please enter valid numbers for quantity and price.");
+            return;
+        }
+
         const updates = {
             name: editingItem.name,
-            quantity: parseInt(editingItem.quantity),
-            price: parseFloat(editingItem.price),
+            quantity,
+            price,
             category: editingItem.category
         };
 
@@ -768,6 +776,9 @@ export default function App() {
             } else {
                 await supabase.from('items').delete().eq('id', id);
             }
+
+            // Sync with DB to get real IDs for any future edits/deletes
+            refreshData(fridgeUser.fridge_id);
         }
     };
 
@@ -821,7 +832,8 @@ export default function App() {
                 await supabase.from('items').delete().eq('id', item.id);
             }
 
-            await refreshData(fridgeUser.fridge_id);
+            // Sync with DB to get real IDs for any future edits/deletes
+            refreshData(fridgeUser.fridge_id);
         }
     };
 
@@ -1845,81 +1857,6 @@ export default function App() {
                         </div>
                     )}
 
-                    {activeTab === 'consumed' && (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Total Value</p>
-                                    <p className="text-2xl font-black text-emerald-600">${filteredConsumedItems.reduce((acc, i) => acc + (i.price * i.quantity), 0).toFixed(2)}</p>
-                                </div>
-                                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Items Count</p>
-                                    <p className="text-2xl font-black text-slate-900">{filteredConsumedItems.length}</p>
-                                </div>
-                            </div>
-
-                            {filteredConsumedItems.length === 0 ? (
-                                <div className="text-center py-20 opacity-40">
-                                    <UtensilsCrossed className="w-12 h-12 mx-auto mb-4 stroke-1" />
-                                    <p className="font-bold">No consumed items found</p>
-                                    <p className="text-sm">Try adjusting your filters</p>
-                                </div>
-                            ) : (
-                                Object.entries(groupItemsByDate(filteredConsumedItems, 'consumed_at')).map(([dateLabel, groupItems]) => (
-                                    groupItems.length > 0 && (
-                                        <div key={dateLabel} className="animate-in fade-in slide-in-from-bottom-2">
-                                            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 pl-2">{dateLabel}</h3>
-                                            <div className="space-y-3">
-                                                {groupItems.map((item, i) => (
-                                                    <div key={i} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 relative">
-                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${CATEGORIES[item.category]?.color || CATEGORIES.Other.color}`}>
-                                                            {item.emoji || CATEGORIES[item.category]?.icon || '📦'}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex justify-between items-start">
-                                                                <p className="font-bold text-slate-800 text-sm truncate">
-                                                                    {item.quantity > 1 && <span className="text-emerald-600 mr-1">x{item.quantity}</span>}
-                                                                    {item.name}
-                                                                </p>
-                                                                <span className="font-bold text-slate-400 text-[10px]">${(item.price * (item.quantity || 1))?.toFixed(2)}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 mt-1">
-                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                    Consumed: {(() => {
-                                                                        const date = new Date(item.consumed_at || item.created_at);
-                                                                        return isNaN(date.getTime()) ? 'Unknown' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                                                    })()}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Kebab Menu */}
-                                                        <div className="relative">
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.id ? null : item.id); }}
-                                                                className="p-2 text-slate-300 hover:text-slate-600 rounded-lg"
-                                                            >
-                                                                <MoreVertical size={16} />
-                                                            </button>
-                                                            {openMenuId === item.id && (
-                                                                <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-20 min-w-[140px] flex flex-col gap-1 animate-in fade-in zoom-in-95 origin-top-right">
-                                                                    {/* Future: Undo Consume (Move back to Fridge) */}
-                                                                    <div className="p-3 text-[10px] text-slate-400 font-bold text-center">No actions available</div>
-                                                                </div>
-                                                            )}
-                                                            {activeTab === 'consumed' && openMenuId === item.id && (
-                                                                <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )
-                                ))
-                            )}
-                        </div>
-                    )}
                     {/* Unified History Tab */}
                     {activeTab === 'history' && (
                         <div className="space-y-4">
