@@ -2175,7 +2175,7 @@ export default function App() {
                         <div className="space-y-4">
                             {Object.entries(historyGroups).map(([date, items]) => (
                                 <div key={date}>
-                                    <h3 className="sticky top-[140px] z-10 py-2 bg-slate-50/95 backdrop-blur text-xs font-black text-slate-400 uppercase tracking-widest pl-2 mb-2">
+                                    <h3 className="sticky lg:top-0 top-[140px] z-10 py-2 bg-slate-50/95 backdrop-blur text-xs font-black text-slate-400 uppercase tracking-widest pl-2 mb-2">
                                         {date === 'Unknown Date' ? date : new Date(date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
                                     </h3>
                                     <div className="space-y-2">
